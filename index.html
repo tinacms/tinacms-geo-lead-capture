@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Search Readiness Checker | Free SEO &amp; AEO Analysis by TinaCMS</title>
+    <meta
+      name="description"
+      content="Score any page for SEO and answer-engine optimization (AEO/GEO) in seconds. Every check is graded against Google's own guidance and published research."
+    />
+    <link rel="canonical" href="https://tools.tina.io/" />
+    <link rel="icon" href="/tina-logo.svg" type="image/svg+xml" />
+    <meta property="og:title" content="AI Search Readiness Checker" />
+    <meta
+      property="og:description"
+      content="Free SEO & AEO analysis. Every check graded against Google's guidance and published research."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="https://tina.io" target="_blank" rel="noopener" aria-label="TinaCMS home">
+          <img src="/tina-logo.svg" alt="TinaCMS" height="26" />
+        </a>
+        <nav class="header-nav">
+          <a href="https://tina.io/docs" target="_blank" rel="noopener">Docs</a>
+          <a href="https://tina.io/blog" target="_blank" rel="noopener">Blog</a>
+          <a class="btn btn-sm" href="https://tina.io" target="_blank" rel="noopener">Try TinaCMS</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wrap page">
+      <section class="hero">
+        <h1>Is your site ready for <span class="hl">AI search</span>?</h1>
+        <form class="analyze-form" id="analyze-form" novalidate>
+          <div class="input-wrap">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input
+              type="text"
+              id="url"
+              inputmode="url"
+              placeholder="yourdomain.com/page"
+              aria-label="Page URL to analyze"
+            />
+          </div>
+          <button class="btn" type="submit" id="analyze-btn">
+            Analyze
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+        <p class="error hidden" id="form-error"></p>
+        <p class="microcopy">
+          No signup to see your score. We only read your page&rsquo;s public HTML.
+        </p>
+      </section>
+
+      <main class="results hidden" id="results"></main>
+
+      <section class="cta-banner reveal">
+        <div class="cta-llama-wrap">
+          <span class="cta-llama-shadow" aria-hidden="true"></span>
+          <div class="cta-llama"><canvas class="cta-metal" aria-hidden="true"></canvas></div>
+        </div>
+        <div class="cta-text">
+          <h2>Want a hand getting AI-ready?</h2>
+          <p>
+            TinaCMS gives your content clean, structured, Git-backed markup that
+            people and AI can both read. Tell us what you&rsquo;re building.
+          </p>
+          <a class="btn" href="https://tina.io" target="_blank" rel="noopener">
+            Get in touch
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </section>
+    </div>
+
+    <footer class="site">
+      <div class="footer-inner">
+        <a class="footer-brand" href="https://tina.io" target="_blank" rel="noopener" aria-label="TinaCMS home">
+          <img src="/tina-logo.svg" alt="TinaCMS" height="22" />
+        </a>
+        <p class="footer-tag">The open-source, Git-backed headless CMS.</p>
+        <nav class="footer-links">
+          <a href="https://tina.io" target="_blank" rel="noopener">tina.io</a>
+          <a href="https://tina.io/docs" target="_blank" rel="noopener">Docs</a>
+          <a href="https://github.com/tinacms/tinacms" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <p class="footer-copy">Free tool by TinaCMS. Static single-page analysis.</p>
+      </div>
+    </footer>
+
+    <div class="scroll-hint" id="scroll-hint" aria-hidden="true">
+      <span>Scroll for your full report</span>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

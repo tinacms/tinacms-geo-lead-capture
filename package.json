@@ -1,0 +1,13 @@
+{
+  "name": "tina-ai-search-readiness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Static SEO x AEO/GEO analysis lead-capture tool.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
