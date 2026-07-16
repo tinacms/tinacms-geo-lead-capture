@@ -204,15 +204,21 @@ const draw = (inst, now) => {
     canvas.height = h;
     gl.viewport(0, 0, w, h);
   }
-  if (inst.last === null) {
+  if (inst.sync) {
+    // Mirror another instance's clock so both canvases (same size) render the
+    // exact same metal pattern.
+    inst.phase = inst.sync.phase;
+  } else {
+    if (inst.last === null) {
+      inst.last = now;
+    }
+    const dt = Math.min(0.05, (now - inst.last) / 1000);
     inst.last = now;
+    // Ease current speed toward its target -> smooth loading -> loaded slow-down.
+    inst.speed += (inst.target - inst.speed) * Math.min(1, dt * 2.5);
+    const rate = inst.speed * (1 + inst.pulse * Math.sin(now * 0.0075));
+    inst.phase += dt * rate;
   }
-  const dt = Math.min(0.05, (now - inst.last) / 1000);
-  inst.last = now;
-  // Ease current speed toward its target -> smooth loading -> loaded slow-down.
-  inst.speed += (inst.target - inst.speed) * Math.min(1, dt * 2.5);
-  const rate = inst.speed * (1 + inst.pulse * Math.sin(now * 0.0075));
-  inst.phase += dt * rate;
   // On-screen feature size (bigger = looser, coarser metal).
   gl.uniform1f(loc.u_scale, inst.feature / Math.max(1, Math.min(w, h)));
   gl.uniform2f(loc.u_resolution, canvas.clientWidth, canvas.clientHeight);
@@ -235,7 +241,9 @@ const loop = (now) => {
 
 // Register a canvas as an animated metal surface. Returns a handle to retune it
 // (used by the loader to speed up then slow down), or null if WebGL2 is absent.
-function register(canvas, { speed = SPEED, pulse = 0, feature = 240 } = {}) {
+// Pass `sync: <handle from another metal()>` to mirror that instance's clock —
+// two same-sized canvases then render an identical pattern.
+function register(canvas, { speed = SPEED, pulse = 0, feature = 240, sync = null } = {}) {
   const g = initGL(canvas);
   if (!g) {
     return null;
@@ -250,6 +258,7 @@ function register(canvas, { speed = SPEED, pulse = 0, feature = 240 } = {}) {
     target: cap(speed),
     pulse: REDUCE ? 0 : pulse,
     feature,
+    sync: sync?._inst ?? null,
     dead: false,
   };
   live.push(inst);
@@ -257,6 +266,7 @@ function register(canvas, { speed = SPEED, pulse = 0, feature = 240 } = {}) {
     rafId = requestAnimationFrame(loop);
   }
   return {
+    _inst: inst,
     setSpeed(s) {
       inst.target = cap(s);
     },

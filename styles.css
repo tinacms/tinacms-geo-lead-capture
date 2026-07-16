@@ -71,6 +71,53 @@ body::before {
 }
 
 /* Header */
+/* Stakeholder A/B/C preview bar (internal chrome, deliberately dark) */
+.vbar {
+  background: #14141a;
+  color: #e6e8ee;
+}
+.vbar-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.5rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.vbar-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #8a91a3;
+}
+.vbar-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+.vtab {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #c4c9d6;
+  text-decoration: none;
+  padding: 0.32rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.vtab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+.vtab.active {
+  color: #fff;
+  background: var(--orange);
+}
+
 .site-header {
   position: sticky;
   top: 0;
@@ -312,7 +359,191 @@ input:focus {
   box-shadow: var(--shadow);
 }
 
-/* Gemini score reveal */
+/* Metal-masked overall number. The flex row centres the disc + stats as one
+   group; the stats column animates 0fr -> 1fr on load, so the disc starts
+   dead-centre and slides left smoothly as the group re-centres. */
+.big-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 1rem 0 0.5rem;
+  min-height: 9rem;
+  opacity: 0;
+  transform: translateX(-24px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.big-score.in {
+  opacity: 1;
+  transform: none;
+}
+
+.big-score-metal {
+  position: relative;
+  flex-shrink: 0;
+  height: clamp(11rem, 18vw, 15.5rem);
+  /* Square box = the disc itself; a wider box wasted ~12rem of the 56rem page
+     column and squeezed the stats into their overflow clip. */
+  aspect-ratio: 1 / 1;
+}
+
+.big-score-metal canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Static fallback fill when WebGL2 is unavailable */
+  background: linear-gradient(135deg, #d9d9df, #8f8f99 45%, #f2f2f6 55%, #7a7a86 72%, #cfcfd6);
+}
+
+/* Metal-masked number under the disc: fades up as the disc fades out. The
+   digit mask sits on .bs-num-in; the ink layer inside the same mask then
+   slowly fades the metal to black. Shadow on this unmasked wrapper — filter
+   runs before mask, so on .bs-num-in it would be clipped away. */
+.bs-num {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  /* Harsh while the metal number appears; fades to nothing as the ink lands. */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55)) drop-shadow(0 10px 26px rgba(0, 0, 0, 0.45));
+}
+
+.bs-num-in {
+  position: absolute;
+  inset: 0;
+}
+
+.big-score.loaded .bs-num {
+  opacity: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0)) drop-shadow(0 10px 26px rgba(0, 0, 0, 0));
+  transition:
+    opacity 1.1s ease 0.35s,
+    filter 2s ease 1.3s;
+}
+
+.bs-ink {
+  position: absolute;
+  inset: 0;
+  /* Solid ink up top, easing lighter toward the bottom of the digits. */
+  background: linear-gradient(
+    to bottom,
+    var(--heading) 30%,
+    color-mix(in srgb, var(--heading) 45%, #fff) 100%
+  );
+  opacity: 0;
+}
+
+.big-score.loaded .bs-ink {
+  opacity: 1;
+  transition: opacity 2s ease 1.3s;
+}
+
+/* Opaque metal disc on top of the number; fades away on load. */
+.bs-disc {
+  position: absolute;
+  inset: 0;
+  /* Same filter-before-mask rule: shadow here, circle mask on the canvas. */
+  filter: drop-shadow(0 0 9px rgba(0, 0, 0, 0.32)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.45))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  transition: opacity 1.2s ease;
+}
+
+.big-score.loaded .bs-disc {
+  opacity: 0;
+}
+
+.bs-disc canvas {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='47' fill='%23fff'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='47' fill='%23fff'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Stats: labels, pipes and numbers align in columns via subgrid */
+/* Same row anatomy as version C: label | track bar | number (es-* classes).
+   max-width animates 0 -> measured natural width (set inline by JS), so the
+   flex row re-centres continuously, the disc slides left with a full visible
+   ease-out, and nothing is ever clipped at rest. */
+.big-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 0;
+  overflow: hidden;
+  transition:
+    max-width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    margin-left 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.big-score.stats-in .big-stats {
+  margin-left: 3rem;
+}
+
+.big-stats li {
+  display: grid;
+  grid-template-columns: 1fr 6rem auto;
+  align-items: center;
+  gap: 0.9rem;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-14px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.big-score.stats-in .big-stats li {
+  opacity: 1;
+  transform: none;
+}
+
+.gs-cat {
+  justify-self: end;
+  color: var(--text-2);
+}
+
+.gs-sep {
+  color: var(--border-strong);
+}
+
+.gs-num {
+  justify-self: end;
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.post-tease {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6rem, 15vh, 13rem);
+}
+
+@media (max-width: 680px) {
+  .big-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .big-score-metal {
+    height: 10rem;
+  }
+  /* Stacked layout: stats sit below the disc, no left offset needed. */
+  .big-stats,
+  .big-score.stats-in .big-stats {
+    margin-left: 0;
+    justify-content: center;
+  }
+}
+
+/* Version A: gemini star ---------------------------------------------------- */
 .gemini {
   position: relative;
   width: 42rem;
@@ -326,20 +557,21 @@ input:focus {
     opacity 0.6s ease,
     transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
-
 .gemini.in {
   opacity: 1;
   transform: none;
 }
-
 .gemini-star {
   position: absolute;
   left: 0;
   top: 0;
   width: 300px;
   height: 300px;
+  /* Shadow on this unmasked wrapper: filter runs before mask, so putting it on
+     the masked .gemini-metal would clip the shadow away. */
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3)) drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
-
 .gemini-metal {
   position: absolute;
   inset: 0;
@@ -349,13 +581,11 @@ input:focus {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
-
 .gemini-metal canvas {
   display: block;
   width: 100%;
   height: 100%;
 }
-
 .gemini-score {
   position: absolute;
   inset: 0;
@@ -376,12 +606,9 @@ input:focus {
   transition: opacity 0.7s ease 0.15s;
   pointer-events: none;
 }
-
 .gemini.loaded .gemini-score {
   opacity: 1;
 }
-
-/* Stat lines hug the star's right silhouette, positioned via --x / --y. */
 .gemini-stats {
   position: absolute;
   inset: 0;
@@ -389,7 +616,6 @@ input:focus {
   padding: 0;
   margin: 0;
 }
-
 .gemini-stats li {
   position: absolute;
   left: var(--x);
@@ -402,33 +628,13 @@ input:focus {
     opacity 0.5s ease,
     transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
-
 .gemini.loaded .gemini-stats li {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
-
-.gs-cat {
-  color: var(--text-2);
-}
-
-.gs-sep {
-  color: var(--border-strong);
+.gemini-stats .gs-sep {
   margin: 0 0.15rem;
 }
-
-.gs-num {
-  font-family: var(--font-head);
-  font-weight: 700;
-  color: var(--heading);
-}
-
-.post-tease {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(6rem, 15vh, 13rem);
-}
-
 @media (max-width: 680px) {
   .gemini {
     width: 100%;
@@ -462,6 +668,133 @@ input:focus {
   }
   .gemini.loaded .gemini-stats li {
     transform: none;
+  }
+}
+
+/* Version C: editorial / typographic ---------------------------------------- */
+.editorial {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: clamp(2rem, 6vw, 4.5rem);
+  margin: 1rem 0 0.5rem;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.editorial.in {
+  opacity: 1;
+  transform: none;
+}
+.ed-main {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+  padding-right: clamp(2rem, 6vw, 4.5rem);
+  border-right: 1px solid var(--border);
+}
+.ed-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-head);
+  color: var(--heading);
+  line-height: 0.9;
+}
+.ed-num {
+  font-weight: 700;
+  font-size: clamp(5.5rem, 12vw, 9rem);
+  font-variant-numeric: tabular-nums;
+}
+.ed-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.ed-bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--heading);
+}
+.editorial.loading .ed-bar-fill {
+  width: 30%;
+  animation: ed-indeterminate 1.1s ease-in-out infinite;
+}
+.editorial.loaded .ed-bar-fill {
+  width: var(--w);
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes ed-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+.ed-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+  min-width: min(24rem, 42vw);
+}
+.ed-stats li {
+  display: grid;
+  grid-template-columns: 1fr 6rem auto;
+  align-items: center;
+  gap: 0.9rem;
+  opacity: 0;
+  transform: translateX(12px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.editorial.loaded .ed-stats li {
+  opacity: 1;
+  transform: none;
+}
+.es-cat {
+  color: var(--text-2);
+  font-size: 0.98rem;
+}
+.es-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.es-fill {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: inherit;
+  background: var(--border-strong);
+}
+.es-num {
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 680px) {
+  .editorial {
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+  .ed-main {
+    justify-items: center;
+    padding-right: 0;
+    border-right: 0;
+  }
+  .ed-stats {
+    min-width: min(24rem, 88vw);
   }
 }
 
@@ -1273,4 +1606,49 @@ footer.site {
   .scroll-hint svg {
     animation: none;
   }
+}
+
+/* Robot llama over the hero title, fading into it */
+.hero-robot {
+  display: block;
+  width: clamp(260px, 44vw, 460px);
+  aspect-ratio: 1254 / 720; /* crop the full-body render to head-through-waist */
+  height: auto;
+  object-fit: cover;
+  object-position: center top;
+  margin: -0.5rem auto -1.5rem;
+  -webkit-mask-image: linear-gradient(to bottom, #000 64%, transparent 92%);
+  mask-image: linear-gradient(to bottom, #000 64%, transparent 92%);
+}
+
+/* Fix-subcard link row: docs on the left, SSW rule on the right */
+.link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.85rem;
+}
+
+.lr-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ssw-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--orange-600);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ssw-link:hover {
+  text-decoration: underline;
 }

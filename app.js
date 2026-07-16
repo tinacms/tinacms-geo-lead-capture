@@ -205,88 +205,60 @@ const leadGate = (report) => `
     </div>
   </div>`;
 
-// --- gemini score reveal (replaces the loading spinner + summary card) --------
+// --- score reveal (replaces the loading spinner + summary card) ---------------
 
-// Four-point "gemini" spark: sharp tips (N/E/S/W) with concave sides. Each side
-// is a quadratic curve whose control point sits near the centre on the diagonal,
-// bowing the edge inward so the tips read as sharp points.
-const geminiPath = (() => {
-  const c = 150;
-  const R = 148;
-  const d = 0.2 * R; // smaller = deeper concave / spikier
-  const N = `${c},${c - R}`;
-  const E = `${c + R},${c}`;
-  const S = `${c},${c + R}`;
-  const W = `${c - R},${c}`;
-  const ne = `${c + d},${c - d}`;
-  const se = `${c + d},${c + d}`;
-  const sw = `${c - d},${c + d}`;
-  const nw = `${c - d},${c - d}`;
-  return `M${N} Q${ne} ${E} Q${se} ${S} Q${sw} ${W} Q${nw} ${N}Z`;
-})();
-
-const GEMINI_MASK = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'><path d='${geminiPath}' fill='#fff'/></svg>`,
-)}")`;
-
-const geminiShell = () => `
-  <div class="gemini" id="gemini">
-    <div class="gemini-star">
-      <div class="gemini-metal"><canvas></canvas></div>
-      <div class="gemini-score" id="gemini-score"></div>
-    </div>
-    <ul class="gemini-stats" id="gemini-stats"></ul>
-  </div>`;
-
-// A point on the star's right silhouette (N -> E -> S) for s in [0,1]. Used to
-// hug the stat lines against the shape, spanning its full height.
-const geminiRightEdge = (() => {
-  const N = [150, 2];
-  const E = [298, 150];
-  const S = [150, 298];
-  const ne = [179.6, 120.4];
-  const se = [179.6, 179.6];
-  const q = (p0, cp, p2, t) => {
-    const u = 1 - t;
-    return [
-      u * u * p0[0] + 2 * u * t * cp[0] + t * t * p2[0],
-      u * u * p0[1] + 2 * u * t * cp[1] + t * t * p2[1],
-    ];
-  };
-  return (s) => (s < 0.5 ? q(N, ne, E, s * 2) : q(E, se, S, (s - 0.5) * 2));
-})();
-
-const geminiStats = (report) => {
-  const n = report.categories.length;
-  // Sample the silhouette, then look up its x for evenly spaced y positions so
-  // the lines hug the curve horizontally but stay evenly spaced vertically.
-  const samples = [];
-  for (let k = 0; k <= 240; k++) {
-    samples.push(geminiRightEdge(k / 240));
-  }
-  const edgeX = (y) => {
-    let bx = 0;
-    let bd = Infinity;
-    for (const [x, sy] of samples) {
-      const d = Math.abs(sy - y);
-      if (d < bd) {
-        bd = d;
-        bx = x;
-      }
+// Metal-masked number: a metal canvas masked to the digits. The site font
+// (IBM Plex) is embedded into the mask SVG — web fonts don't otherwise load
+// inside an SVG used as a CSS mask.
+let maskFontCss = '';
+const maskFontReady = fetch('/fonts/IBMPlexSans-SemiBold.woff2')
+  .then((r) => r.arrayBuffer())
+  .then((buf) => {
+    let bin = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) {
+      bin += String.fromCharCode(bytes[i]);
     }
-    return bx;
-  };
-  const top = 40;
-  const bottom = 260;
-  const gap = 28;
-  return report.categories
-    .map((cat, i) => {
-      const y = top + (i / (n - 1)) * (bottom - top);
-      const x = edgeX(y) + gap;
-      return `<li style="--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px;transition-delay:${(0.15 + i * 0.09).toFixed(2)}s"><span class="gs-cat">${esc(cat.title)}</span> <span class="gs-sep">|</span> <span class="gs-num">${cat.score}</span></li>`;
-    })
-    .join('');
+    maskFontCss = `@font-face{font-family:'PlexMask';src:url(data:font/woff2;base64,${btoa(bin)}) format('woff2')}`;
+  })
+  .catch(() => {});
+
+const scoreMaskUri = (n) => {
+  const t = String(n);
+  const H = 100;
+  const W = t.length * 54 + 18;
+  const style = maskFontCss ? `<style>${maskFontCss}</style>` : '';
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * 0.54}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 };
+
+// Set both prefixed and unprefixed mask props (Safari still needs -webkit-).
+const setMask = (el, image, size, position) => {
+  el.style.maskImage = image;
+  el.style.webkitMaskImage = image;
+  el.style.maskSize = size;
+  el.style.webkitMaskSize = size;
+  el.style.maskPosition = position;
+  el.style.webkitMaskPosition = position;
+  el.style.maskRepeat = 'no-repeat';
+  el.style.webkitMaskRepeat = 'no-repeat';
+};
+
+// The stats list starts at max-width 0 (zero footprint) so the disc sits
+// dead-centre while loading; on load it eases out to its measured width and
+// the flex row re-centres the whole group, sliding the disc left smoothly.
+// Then the disc fades out to the metal-masked number, and an ink layer inside
+// the same mask slowly fades the metal to black.
+const bigScoreShell = () => `
+  <div class="big-score loading" id="big-score">
+    <div class="big-score-metal" id="score-metal">
+      <div class="bs-num" id="bs-num">
+        <div class="bs-num-in"><canvas></canvas><i class="bs-ink"></i></div>
+      </div>
+      <div class="bs-disc"><canvas></canvas></div>
+    </div>
+    <ul class="big-stats" id="big-stats"></ul>
+  </div>`;
 
 // --- interaction --------------------------------------------------------------
 
@@ -336,6 +308,126 @@ window.addEventListener(
 
 let geminiHandle = null;
 
+const startBigScore = () => {
+  const box = $('#score-metal');
+  if (!box) {
+    return;
+  }
+  geminiHandle?.destroy();
+  // Fast pulsing metal on the disc while loading; the number's canvas mirrors
+  // the disc's clock so both render the same metal pattern. Orphaned instances
+  // self-clean when their canvas leaves the DOM.
+  geminiHandle = metal(box.querySelector('.bs-disc canvas'), { speed: 0.9, pulse: 0.7 });
+  metal(box.querySelector('.bs-num canvas'), { sync: geminiHandle });
+  requestAnimationFrame(() => $('#big-score').classList.add('in'));
+};
+
+const setBigScoreLoaded = async (report) => {
+  const bs = $('#big-score');
+  const ul = $('#big-stats');
+  // Same rows as version C: label | track bar | number.
+  ul.innerHTML = edStats(report);
+  // Measure the list's natural width so the slide eases to the exact target —
+  // easing toward an oversized max-width cap cuts the visible motion off
+  // mid-curve, which reads as no easing at all.
+  ul.style.maxWidth = 'none';
+  const statsW = ul.offsetWidth;
+  ul.style.maxWidth = '';
+  await maskFontReady;
+  // Digits sized to sit within the square box ("100" is the widest case).
+  const q = [0, 80, 78, 55][String(report.overall).length] || 55;
+  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'center');
+  geminiHandle?.setSpeed(0.16);
+  geminiHandle?.setPulse(0);
+  // Phase 1: stats ease in and the group re-centres (disc slides left).
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      bs.classList.remove('loading');
+      bs.classList.add('stats-in');
+      ul.style.maxWidth = `${statsW}px`;
+    }),
+  );
+  // Phase 2 (CSS): disc fades out to the metal number, which then inks to black.
+  setTimeout(() => bs.classList.add('loaded'), 750);
+};
+
+// --- version A: gemini star (kept for the stakeholder A/B/C preview) ----------
+// Four-point "gemini" spark: sharp tips with concave sides bowing inward.
+const geminiPath = (() => {
+  const c = 150;
+  const R = 148;
+  const d = 0.2 * R;
+  const N = `${c},${c - R}`;
+  const E = `${c + R},${c}`;
+  const S = `${c},${c + R}`;
+  const W = `${c - R},${c}`;
+  const ne = `${c + d},${c - d}`;
+  const se = `${c + d},${c + d}`;
+  const sw = `${c - d},${c + d}`;
+  const nw = `${c - d},${c - d}`;
+  return `M${N} Q${ne} ${E} Q${se} ${S} Q${sw} ${W} Q${nw} ${N}Z`;
+})();
+
+const GEMINI_MASK = `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'><path d='${geminiPath}' fill='#fff'/></svg>`,
+)}")`;
+
+const geminiShell = () => `
+  <div class="gemini" id="gemini">
+    <div class="gemini-star">
+      <div class="gemini-metal"><canvas></canvas></div>
+      <div class="gemini-score" id="gemini-score"></div>
+    </div>
+    <ul class="gemini-stats" id="gemini-stats"></ul>
+  </div>`;
+
+// A point on the star's right silhouette (N -> E -> S), used to hug the stats.
+const geminiRightEdge = (() => {
+  const N = [150, 2];
+  const E = [298, 150];
+  const S = [150, 298];
+  const ne = [179.6, 120.4];
+  const se = [179.6, 179.6];
+  const q = (p0, cp, p2, t) => {
+    const u = 1 - t;
+    return [
+      u * u * p0[0] + 2 * u * t * cp[0] + t * t * p2[0],
+      u * u * p0[1] + 2 * u * t * cp[1] + t * t * p2[1],
+    ];
+  };
+  return (s) => (s < 0.5 ? q(N, ne, E, s * 2) : q(E, se, S, (s - 0.5) * 2));
+})();
+
+const geminiStats = (report) => {
+  const n = report.categories.length;
+  const samples = [];
+  for (let k = 0; k <= 240; k++) {
+    samples.push(geminiRightEdge(k / 240));
+  }
+  const edgeX = (y) => {
+    let bx = 0;
+    let bd = Infinity;
+    for (const [x, sy] of samples) {
+      const dd = Math.abs(sy - y);
+      if (dd < bd) {
+        bd = dd;
+        bx = x;
+      }
+    }
+    return bx;
+  };
+  const top = 40;
+  const bottom = 260;
+  const gap = 52;
+  return report.categories
+    .map((cat, i) => {
+      const y = top + (i / (n - 1)) * (bottom - top);
+      const x = edgeX(y) + gap;
+      return `<li style="--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px;transition-delay:${(0.15 + i * 0.09).toFixed(2)}s"><span class="gs-cat">${esc(cat.title)}</span> <span class="gs-sep">|</span> <span class="gs-num">${cat.score}</span></li>`;
+    })
+    .join('');
+};
+
 const startGemini = () => {
   const g = $('#gemini');
   if (!g) {
@@ -345,7 +437,6 @@ const startGemini = () => {
   metalEl.style.maskImage = GEMINI_MASK;
   metalEl.style.webkitMaskImage = GEMINI_MASK;
   geminiHandle?.destroy();
-  // Fast pulsing metal while loading.
   geminiHandle = metal(g.querySelector('canvas'), { speed: 0.9, pulse: 0.7 });
   requestAnimationFrame(() => g.classList.add('in'));
 };
@@ -354,13 +445,76 @@ const setGeminiLoaded = (report) => {
   const g = $('#gemini');
   $('#gemini-score').textContent = report.overall;
   $('#gemini-stats').innerHTML = geminiStats(report);
-  // Slow the metal and settle.
   geminiHandle?.setSpeed(0.16);
   geminiHandle?.setPulse(0);
+  requestAnimationFrame(() => requestAnimationFrame(() => g.classList.add('loaded')));
+};
+
+// --- version C: editorial / typographic (no shader, deliberately restrained) --
+const edStats = (report) =>
+  report.categories
+    .map(
+      (cat, i) =>
+        `<li style="transition-delay:${(0.12 + i * 0.07).toFixed(2)}s"><span class="es-cat">${esc(cat.title)}</span><span class="es-track"><span class="es-fill" style="--w:${cat.score}%"></span></span><span class="es-num">${cat.score}</span></li>`,
+    )
+    .join('');
+
+const countUp = (el, to, ms) => {
+  const start = performance.now();
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / ms);
+    el.textContent = Math.round(to * (1 - (1 - t) ** 3));
+    if (t < 1) {
+      requestAnimationFrame(tick);
+    }
+  };
+  requestAnimationFrame(tick);
+};
+
+const editorialShell = () => `
+  <div class="editorial loading" id="editorial">
+    <div class="ed-main">
+      <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
+      <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
+    </div>
+    <ul class="ed-stats" id="ed-stats"></ul>
+  </div>`;
+
+const startEditorial = () => {
+  const el = $('#editorial');
+  if (!el) {
+    return;
+  }
+  geminiHandle?.destroy();
+  geminiHandle = null;
+  requestAnimationFrame(() => el.classList.add('in'));
+};
+
+const setEditorialLoaded = (report) => {
+  const el = $('#editorial');
+  $('#ed-stats').innerHTML = edStats(report);
+  countUp($('#ed-num'), report.overall, 900);
+  $('#ed-bar-fill').style.setProperty('--w', `${report.overall}%`);
   requestAnimationFrame(() =>
-    requestAnimationFrame(() => g.classList.add('loaded')),
+    requestAnimationFrame(() => {
+      el.classList.remove('loading');
+      el.classList.add('loaded');
+    }),
   );
 };
+
+// --- version registry: A/B/C differ only in the score hero --------------------
+const SCORE = {
+  a: { id: 'gemini', shell: geminiShell, start: startGemini, loaded: setGeminiLoaded },
+  b: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
+  c: { id: 'editorial', shell: editorialShell, start: startEditorial, loaded: setEditorialLoaded },
+};
+let variant = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
+if (!SCORE[variant]) {
+  variant = 'b';
+}
+const activeScore = () => SCORE[variant];
+let lastReport = null;
 
 const wireAccordion = () => {
   results.querySelectorAll('.check-btn').forEach((btn) => {
@@ -395,11 +549,15 @@ const wireCopy = (report) => {
 };
 
 const renderResults = (report) => {
-  setGeminiLoaded(report);
-  $('#gemini').insertAdjacentHTML(
-    'afterend',
-    `<div class="post-tease" id="post-tease">${topFixes(report)}<div id="gate-slot">${leadGate(report)}</div></div>`,
-  );
+  lastReport = report;
+  const s = activeScore();
+  s.loaded(report);
+  document
+    .getElementById(s.id)
+    .insertAdjacentHTML(
+      'afterend',
+      `<div class="post-tease" id="post-tease">${topFixes(report)}<div id="gate-slot">${leadGate(report)}</div></div>`,
+    );
   revealAll();
   armScrollHint();
   wireLeadForm(report);
@@ -457,9 +615,9 @@ $('#analyze-form').addEventListener('submit', async (e) => {
     return;
   }
   errEl.classList.add('hidden');
-  results.innerHTML = geminiShell();
+  results.innerHTML = activeScore().shell();
   results.classList.remove('hidden');
-  startGemini();
+  activeScore().start();
   btn.disabled = true;
   const minLoad = new Promise((r) => setTimeout(r, 1200));
   const fail = (msg) => {
@@ -496,3 +654,39 @@ if (llamaCanvas) {
   metal(llamaCanvas, { speed: 0.16, feature: 300 });
 }
 revealAll();
+
+// A/B/C version switcher (stakeholder preview). Tabs swap the score hero live;
+// if a report is already on screen it re-plays the reveal in the new style.
+const vtabs = Array.from(document.querySelectorAll('.vtab'));
+const heroRobot = document.querySelector('.hero-robot');
+const setActiveTab = () => {
+  for (const t of vtabs) {
+    t.classList.toggle('active', t.dataset.v === variant);
+    t.setAttribute('aria-selected', t.dataset.v === variant ? 'true' : 'false');
+  }
+  // The waist-up llama is a version-B flourish; A and C keep a text-only hero.
+  if (heroRobot) {
+    heroRobot.style.display = variant === 'b' ? 'block' : 'none';
+  }
+};
+setActiveTab();
+for (const t of vtabs) {
+  t.addEventListener('click', (e) => {
+    e.preventDefault();
+    const v = t.dataset.v;
+    if (v === variant || !SCORE[v]) {
+      return;
+    }
+    variant = v;
+    history.replaceState(null, '', `?v=${v}`);
+    setActiveTab();
+    if (!lastReport) {
+      return;
+    }
+    // Re-play the reveal in the newly selected style.
+    results.innerHTML = activeScore().shell();
+    results.classList.remove('hidden');
+    activeScore().start();
+    setTimeout(() => renderResults(lastReport), 850);
+  });
+}
