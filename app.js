@@ -227,7 +227,7 @@ const scoreMaskUri = (n) => {
   const H = 100;
   const W = t.length * 54 + 18;
   const style = maskFontCss ? `<style>${maskFontCss}</style>` : '';
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * 0.54}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * 0.58}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 };
 
@@ -250,11 +250,14 @@ const setMask = (el, image, size, position) => {
 // the same mask slowly fades the metal to black.
 const bigScoreShell = () => `
   <div class="big-score loading" id="big-score">
-    <div class="big-score-metal" id="score-metal">
-      <div class="bs-num" id="bs-num">
-        <div class="bs-num-in"><canvas></canvas><i class="bs-ink"></i></div>
+    <div class="bs-metal-col">
+      <div class="big-score-metal" id="score-metal">
+        <div class="bs-num" id="bs-num">
+          <div class="bs-num-in"><canvas></canvas><i class="bs-ink"></i></div>
+        </div>
+        <div class="bs-disc"><canvas></canvas></div>
       </div>
-      <div class="bs-disc"><canvas></canvas></div>
+      <span class="bs-label">Overall score</span>
     </div>
     <ul class="big-stats" id="big-stats"></ul>
   </div>`;
@@ -335,7 +338,7 @@ const setBigScoreLoaded = async (report) => {
   await maskFontReady;
   // Digits sized to sit within the square box ("100" is the widest case).
   const q = [0, 80, 78, 55][String(report.overall).length] || 55;
-  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'center');
+  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'bottom');
   geminiHandle?.setSpeed(0.16);
   geminiHandle?.setPulse(0);
   // Phase 1: stats ease in and the group re-centres (disc slides left).
