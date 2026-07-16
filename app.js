@@ -41,8 +41,7 @@ const READ_LABEL = {
 const sourceLink = (ev) =>
   `<a class="read-more" href="${esc(ev.url)}" target="_blank" rel="noopener noreferrer">${READ_LABEL[ev.type]} at ${esc(ev.source)}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
 
-const evidenceRow = (ev) =>
-  `<div class="ev-row">${evidenceBadge(ev)}${sourceLink(ev)}</div>`;
+const evidenceRow = (ev) => `<div class="ev-row">${evidenceBadge(ev)}</div>`;
 
 const sswLink = (ssw) =>
   `<a class="ssw-link" href="${esc(ssw.url)}" target="_blank" rel="noopener noreferrer" title="SSW Rule: ${esc(ssw.title)}">Read the SSW rule<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
@@ -110,7 +109,7 @@ const checkRow = (check) => `
         <p><strong>Fix:</strong> ${esc(check.fix)}</p>
         <p><strong>Why it matters:</strong> ${esc(check.why)}</p>
         <div class="link-row">
-          <span class="lr-left">${evidenceBadge(check.evidence)}${sourceLink(check.evidence)}</span>
+          <span class="lr-left">${evidenceBadge(check.evidence)}</span>
           ${check.ssw ? sswLink(check.ssw) : ''}
         </div>
       </div>
@@ -228,7 +227,7 @@ const scoreMaskUri = (n) => {
   const H = 100;
   const W = t.length * 54 + 18;
   const style = maskFontCss ? `<style>${maskFontCss}</style>` : '';
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * 0.54}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * 0.58}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 };
 
@@ -251,11 +250,14 @@ const setMask = (el, image, size, position) => {
 // the same mask slowly fades the metal to black.
 const bigScoreShell = () => `
   <div class="big-score loading" id="big-score">
-    <div class="big-score-metal" id="score-metal">
-      <div class="bs-num" id="bs-num">
-        <div class="bs-num-in"><canvas></canvas><i class="bs-ink"></i></div>
+    <div class="bs-metal-col">
+      <div class="big-score-metal" id="score-metal">
+        <div class="bs-num" id="bs-num">
+          <div class="bs-num-in"><canvas></canvas><i class="bs-ink"></i></div>
+        </div>
+        <div class="bs-disc"><canvas></canvas></div>
       </div>
-      <div class="bs-disc"><canvas></canvas></div>
+      <span class="bs-label">Overall score</span>
     </div>
     <ul class="big-stats" id="big-stats"></ul>
   </div>`;
@@ -336,7 +338,7 @@ const setBigScoreLoaded = async (report) => {
   await maskFontReady;
   // Digits sized to sit within the square box ("100" is the widest case).
   const q = [0, 80, 78, 55][String(report.overall).length] || 55;
-  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'center');
+  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'bottom');
   geminiHandle?.setSpeed(0.16);
   geminiHandle?.setPulse(0);
   // Phase 1: stats ease in and the group re-centres (disc slides left).
@@ -508,6 +510,7 @@ const SCORE = {
   a: { id: 'gemini', shell: geminiShell, start: startGemini, loaded: setGeminiLoaded },
   b: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
   c: { id: 'editorial', shell: editorialShell, start: startEditorial, loaded: setEditorialLoaded },
+  d: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
 };
 let variant = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
 if (!SCORE[variant]) {
@@ -648,11 +651,6 @@ $('#analyze-form').addEventListener('submit', async (e) => {
   }
 });
 
-// Metal-filled llama in the contact banner (masked to the llama silhouette).
-const llamaCanvas = document.querySelector('.cta-metal');
-if (llamaCanvas) {
-  metal(llamaCanvas, { speed: 0.16, feature: 300 });
-}
 revealAll();
 
 // A/B/C version switcher (stakeholder preview). Tabs swap the score hero live;

@@ -381,6 +381,30 @@ input:focus {
   transform: none;
 }
 
+.bs-metal-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  transform: translateY(-50px);
+}
+
+.bs-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.6s ease 0.35s;
+}
+
+.big-score.loaded .bs-label {
+  opacity: 1;
+}
+
 .big-score-metal {
   position: relative;
   flex-shrink: 0;
@@ -478,6 +502,7 @@ input:focus {
     max-width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
     margin-left 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   display: grid;
+  grid-template-columns: 1fr 6rem auto;
   gap: 0.85rem;
 }
 
@@ -487,15 +512,26 @@ input:focus {
 
 .big-stats li {
   display: grid;
-  grid-template-columns: 1fr 6rem auto;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
   align-items: center;
-  gap: 0.9rem;
+  gap: 1.8rem;
   white-space: nowrap;
   opacity: 0;
   transform: translateX(-14px);
   transition:
     opacity 0.5s ease,
     transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tina-branded fill for the big-score version (kept neutral in editorial). */
+.big-stats .es-fill {
+  background: var(--orange);
+}
+
+/* Right-align the number column so it reads as a flush edge, not ragged. */
+.big-stats .es-num {
+  justify-self: end;
 }
 
 .big-score.stats-in .big-stats li {
@@ -1487,46 +1523,35 @@ footer.site {
 /* Contact banner with a metal-filled llama */
 .cta-banner {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 2.5rem;
   margin: clamp(4.5rem, 9vh, 7.5rem) 0 4rem;
-  padding: 2.75rem;
   background: linear-gradient(120deg, var(--seafoam-100), #eaf2ff);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  overflow: hidden;
 }
 
+/* The photo bleeds flush to the card's bottom edge and rounded corners (via
+   the banner's own overflow:hidden), but keeps a small inset from the top
+   and left edges; the text column keeps the card's full inset padding. */
 .cta-llama-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 132px;
-  aspect-ratio: 141.81 / 196.6;
-}
-
-.cta-llama,
-.cta-llama-shadow {
-  position: absolute;
-  inset: 0;
-  -webkit-mask: url(/llama.svg) center / contain no-repeat;
-  mask: url(/llama.svg) center / contain no-repeat;
-}
-
-/* Orange echo staggered behind the metal llama for depth. */
-.cta-llama-shadow {
-  z-index: 0;
-  background: var(--orange);
-  opacity: 0.9;
-  transform: translate(6px, 5px);
+  width: clamp(180px, 26vw, 260px);
+  margin: 1rem 0 0 1rem;
 }
 
 .cta-llama {
-  z-index: 1;
-}
-
-.cta-metal {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.cta-text {
+  padding: 2.75rem 2.75rem 2.75rem 0;
 }
 
 .cta-text h2 {
@@ -1547,7 +1572,9 @@ footer.site {
   .cta-banner {
     flex-direction: column;
     text-align: center;
-    padding: 2rem;
+  }
+  .cta-text {
+    padding: 0 2rem 2rem;
   }
   .cta-text p {
     margin-inline: auto;
