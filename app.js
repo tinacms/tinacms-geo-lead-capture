@@ -41,8 +41,7 @@ const READ_LABEL = {
 const sourceLink = (ev) =>
   `<a class="read-more" href="${esc(ev.url)}" target="_blank" rel="noopener noreferrer">${READ_LABEL[ev.type]} at ${esc(ev.source)}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
 
-const evidenceRow = (ev) =>
-  `<div class="ev-row">${evidenceBadge(ev)}${sourceLink(ev)}</div>`;
+const evidenceRow = (ev) => `<div class="ev-row">${evidenceBadge(ev)}</div>`;
 
 const sswLink = (ssw) =>
   `<a class="ssw-link" href="${esc(ssw.url)}" target="_blank" rel="noopener noreferrer" title="SSW Rule: ${esc(ssw.title)}">Read the SSW rule<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
@@ -110,7 +109,7 @@ const checkRow = (check) => `
         <p><strong>Fix:</strong> ${esc(check.fix)}</p>
         <p><strong>Why it matters:</strong> ${esc(check.why)}</p>
         <div class="link-row">
-          <span class="lr-left">${evidenceBadge(check.evidence)}${sourceLink(check.evidence)}</span>
+          <span class="lr-left">${evidenceBadge(check.evidence)}</span>
           ${check.ssw ? sswLink(check.ssw) : ''}
         </div>
       </div>
@@ -508,6 +507,7 @@ const SCORE = {
   a: { id: 'gemini', shell: geminiShell, start: startGemini, loaded: setGeminiLoaded },
   b: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
   c: { id: 'editorial', shell: editorialShell, start: startEditorial, loaded: setEditorialLoaded },
+  d: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
 };
 let variant = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
 if (!SCORE[variant]) {
@@ -648,11 +648,6 @@ $('#analyze-form').addEventListener('submit', async (e) => {
   }
 });
 
-// Metal-filled llama in the contact banner (masked to the llama silhouette).
-const llamaCanvas = document.querySelector('.cta-metal');
-if (llamaCanvas) {
-  metal(llamaCanvas, { speed: 0.16, feature: 300 });
-}
 revealAll();
 
 // A/B/C version switcher (stakeholder preview). Tabs swap the score hero live;
