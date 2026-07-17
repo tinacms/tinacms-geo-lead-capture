@@ -387,6 +387,10 @@ input:focus {
   align-items: center;
   gap: 0.15rem;
   flex-shrink: 0;
+}
+
+/* D only: lift the metal so the label below keeps the group optically centred. */
+.big-score.bs-d .bs-metal-col {
   transform: translateY(-50px);
 }
 
@@ -515,7 +519,7 @@ input:focus {
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
   align-items: center;
-  gap: 1.8rem;
+  gap: 0.9rem;
   white-space: nowrap;
   opacity: 0;
   transform: translateX(-14px);
@@ -524,13 +528,17 @@ input:focus {
     transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Tina-branded fill for the big-score version (kept neutral in editorial). */
-.big-stats .es-fill {
+/* D only: Tina-branded fill, roomier rows, and a flush right number edge.
+   B keeps the neutral editorial styling. */
+.bs-d .big-stats li {
+  gap: 1.8rem;
+}
+
+.bs-d .es-fill {
   background: var(--orange);
 }
 
-/* Right-align the number column so it reads as a flush edge, not ragged. */
-.big-stats .es-num {
+.bs-d .es-num {
   justify-self: end;
 }
 

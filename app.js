@@ -222,12 +222,12 @@ const maskFontReady = fetch('/fonts/IBMPlexSans-SemiBold.woff2')
   })
   .catch(() => {});
 
-const scoreMaskUri = (n) => {
+const scoreMaskUri = (n, y = 0.54) => {
   const t = String(n);
   const H = 100;
   const W = t.length * 54 + 18;
   const style = maskFontCss ? `<style>${maskFontCss}</style>` : '';
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * 0.58}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * y}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 };
 
@@ -248,8 +248,10 @@ const setMask = (el, image, size, position) => {
 // the flex row re-centres the whole group, sliding the disc left smoothly.
 // Then the disc fades out to the metal-masked number, and an ink layer inside
 // the same mask slowly fades the metal to black.
-const bigScoreShell = () => `
-  <div class="big-score loading" id="big-score">
+// `orange` renders the D variant: same reveal, plus the "Overall score" label
+// and D-only styling hooks (.bs-d) so B keeps its original look.
+const bigScoreShell = (orange = false) => `
+  <div class="big-score loading${orange ? ' bs-d' : ''}" id="big-score">
     <div class="bs-metal-col">
       <div class="big-score-metal" id="score-metal">
         <div class="bs-num" id="bs-num">
@@ -257,7 +259,7 @@ const bigScoreShell = () => `
         </div>
         <div class="bs-disc"><canvas></canvas></div>
       </div>
-      <span class="bs-label">Overall score</span>
+      ${orange ? '<span class="bs-label">Overall score</span>' : ''}
     </div>
     <ul class="big-stats" id="big-stats"></ul>
   </div>`;
@@ -337,8 +339,15 @@ const setBigScoreLoaded = async (report) => {
   ul.style.maxWidth = '';
   await maskFontReady;
   // Digits sized to sit within the square box ("100" is the widest case).
+  // D bottom-aligns them (label below); B keeps them centred.
+  const d = variant === 'd';
   const q = [0, 80, 78, 55][String(report.overall).length] || 55;
-  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'bottom');
+  setMask(
+    $('#bs-num .bs-num-in'),
+    scoreMaskUri(report.overall, d ? 0.58 : 0.54),
+    `auto ${q}%`,
+    d ? 'bottom' : 'center',
+  );
   geminiHandle?.setSpeed(0.16);
   geminiHandle?.setPulse(0);
   // Phase 1: stats ease in and the group re-centres (disc slides left).
@@ -510,7 +519,7 @@ const SCORE = {
   a: { id: 'gemini', shell: geminiShell, start: startGemini, loaded: setGeminiLoaded },
   b: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
   c: { id: 'editorial', shell: editorialShell, start: startEditorial, loaded: setEditorialLoaded },
-  d: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
+  d: { id: 'big-score', shell: () => bigScoreShell(true), start: startBigScore, loaded: setBigScoreLoaded },
 };
 let variant = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
 if (!SCORE[variant]) {
