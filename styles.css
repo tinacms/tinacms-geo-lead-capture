@@ -382,19 +382,25 @@ input:focus {
 }
 
 .bs-metal-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
+  position: relative;
   flex-shrink: 0;
 }
 
-/* D only: lift the metal so the label below keeps the group optically centred. */
-.big-score.bs-d .bs-metal-col {
-  transform: translateY(-50px);
+/* D only: nudge the revealed number up so digits + label together sit
+   optically centred against the stats (tuned by eye). The disc itself stays
+   put so the loading circle remains dead-centre. */
+.big-score.bs-d .bs-num {
+  transform: translateY(-1.4rem);
 }
 
+/* The label hangs below the digits without taking layout space (--dh = half
+   the digit height, set by JS), so the number stays centre-aligned with the
+   stats beside it. */
 .bs-label {
+  position: absolute;
+  top: calc(50% + var(--dh, 39%) + 0.5rem - 1.4rem);
+  left: 0;
+  right: 0;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;

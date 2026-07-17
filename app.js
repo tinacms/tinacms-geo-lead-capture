@@ -222,8 +222,9 @@ const maskFontReady = fetch('/fonts/IBMPlexSans-SemiBold.woff2')
   })
   .catch(() => {});
 
-const scoreMaskUri = (n, y = 0.54) => {
+const scoreMaskUri = (n) => {
   const t = String(n);
+  const y = 0.54;
   const H = 100;
   const W = t.length * 54 + 18;
   const style = maskFontCss ? `<style>${maskFontCss}</style>` : '';
@@ -338,16 +339,12 @@ const setBigScoreLoaded = async (report) => {
   const statsW = ul.offsetWidth;
   ul.style.maxWidth = '';
   await maskFontReady;
-  // Digits sized to sit within the square box ("100" is the widest case).
-  // D bottom-aligns them (label below); B keeps them centred.
-  const d = variant === 'd';
+  // Digits sized to sit within the square box ("100" is the widest case),
+  // centred so the visible number aligns with the stats beside it. --dh lets
+  // D's label hug the digits' real bottom edge, whatever the digit count.
   const q = [0, 80, 78, 55][String(report.overall).length] || 55;
-  setMask(
-    $('#bs-num .bs-num-in'),
-    scoreMaskUri(report.overall, d ? 0.58 : 0.54),
-    `auto ${q}%`,
-    d ? 'bottom' : 'center',
-  );
+  $('.bs-metal-col').style.setProperty('--dh', `${q / 2}%`);
+  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'center');
   geminiHandle?.setSpeed(0.16);
   geminiHandle?.setPulse(0);
   // Phase 1: stats ease in and the group re-centres (disc slides left).
