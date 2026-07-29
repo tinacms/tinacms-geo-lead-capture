@@ -19,7 +19,7 @@ const ICONS = {
 };
 
 const statusIcon = (status) =>
-  `<svg class="check-icon i-${status}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ICONS[status] || ICONS.info}</svg>`;
+  `<svg class="check-icon i-${status}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[status] || ICONS.info}</svg>`;
 
 const EV_LABEL = {
   official: 'Official docs',
@@ -71,25 +71,17 @@ const buildMarkdown = (report) => {
   return out.join('\n');
 };
 
-const agentFeature = (report) => `
-  <section class="agent-feature reveal">
-    <canvas class="agent-metal" aria-hidden="true"></canvas>
-    <div class="agent-feature-text">
-      <span class="agent-eyebrow">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-        Made for your AI
-      </span>
-      <h2>You&rsquo;re going to paste this into your AI anyway</h2>
-      <p>Grab the whole report as Markdown, every check, its fix and its source, ready to drop into ChatGPT, Claude or your coding agent.</p>
-      <button class="btn" type="button" id="copy-md">
+const reportHeader = (report) => `
+  <section class="report-head reveal">
+    <div class="report-head-text">
+      <h2>Your full report</h2>
+      <p>All ${report.totalScored} checks, with the exact fix and the evidence behind each.</p>
+    </div>
+    <button class="btn btn-ghost" type="button" id="copy-md">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-        Copy report as Markdown
+        Copy as Markdown
       </button>
-    </div>
-    <div class="agent-code" aria-hidden="true">
-      <div class="agent-code-bar"><i></i><i></i><i></i><em>ai-search-readiness.md</em></div>
-      <pre id="md-pre"></pre>
-    </div>
+    <pre id="md-pre" hidden></pre>
   </section>`;
 
 const checkRow = (check) => `
@@ -137,7 +129,7 @@ const TOOLS = [
 
 const fullReport = (report) => `
   <div class="report">
-    ${agentFeature(report)}
+    ${reportHeader(report)}
     <div class="report-cats">
       <section class="read-yourself reveal">
         <h3>If you&rsquo;d rather read it yourself</h3>
@@ -197,7 +189,7 @@ const leadGate = (report) => `
       <p>Unlock all ${report.totalScored} checks with the exact fix and the evidence behind each one, plus where to go next. We&rsquo;ll email you a copy.</p>
       <form id="lead-form">
         <input type="email" id="lead-email" placeholder="you@company.com" aria-label="Your email" />
-        <button class="btn" type="submit" id="lead-btn">Unlock report</button>
+        <button class="btn" type="submit" id="lead-btn">Send report</button>
       </form>
       <p class="error hidden" id="lead-error"></p>
       <p class="microcopy">No spam. Unsubscribe anytime.</p>
@@ -384,6 +376,7 @@ const geminiShell = () => `
   <div class="gemini" id="gemini">
     <div class="gemini-star">
       <div class="gemini-metal"><canvas></canvas></div>
+      <div class="gemini-q" aria-hidden="true">&ndash;</div>
       <div class="gemini-score" id="gemini-score"></div>
     </div>
     <ul class="gemini-stats" id="gemini-stats"></ul>
@@ -406,8 +399,21 @@ const geminiRightEdge = (() => {
   return (s) => (s < 0.5 ? q(N, ne, E, s * 2) : q(E, se, S, (s - 0.5) * 2));
 })();
 
-const geminiStats = (report) => {
-  const n = report.categories.length;
+// The five aspects are fixed, so we can lay them out as placeholders before any
+// analysis has run.
+const GEMINI_CATS = [
+  'AI eligibility & crawlability',
+  'Search fundamentals',
+  'Structured data & entities',
+  'Answer-engine content signals',
+  'Agentic web readiness',
+];
+
+// Positions each aspect row against the star's right silhouette. Each row is
+// { title, score }; score is a number, or '–' as a placeholder. No flyout — the
+// rows just sit where they land.
+const geminiRows = (rows) => {
+  const n = rows.length;
   const samples = [];
   for (let k = 0; k <= 240; k++) {
     samples.push(geminiRightEdge(k / 240));
@@ -427,13 +433,38 @@ const geminiStats = (report) => {
   const top = 40;
   const bottom = 260;
   const gap = 52;
-  return report.categories
-    .map((cat, i) => {
+  return rows
+    .map((r, i) => {
       const y = top + (i / (n - 1)) * (bottom - top);
       const x = edgeX(y) + gap;
-      return `<li style="--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px;transition-delay:${(0.15 + i * 0.09).toFixed(2)}s"><span class="gs-cat">${esc(cat.title)}</span> <span class="gs-sep">|</span> <span class="gs-num">${cat.score}</span></li>`;
+      return `<li style="--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px"><span class="gs-cat">${esc(r.title)}</span> <span class="gs-sep">|</span> <span class="gs-num">${r.score}</span></li>`;
     })
     .join('');
+};
+
+// Fill the stats list with the fixed aspect titles and a single dash each.
+const fillGeminiPlaceholder = () => {
+  const el = $('#gemini-stats');
+  if (el && !el.children.length) {
+    el.innerHTML = geminiRows(GEMINI_CATS.map((title) => ({ title, score: '–' })));
+  }
+};
+
+const applyGeminiMask = (g) => {
+  const m = g.querySelector('.gemini-metal');
+  m.style.maskImage = GEMINI_MASK;
+  m.style.webkitMaskImage = GEMINI_MASK;
+};
+
+// Resting placeholder shown before analysis: solid star with a dash for the
+// score and each aspect, no shader, no entrance animation.
+const restGemini = () => {
+  results.innerHTML = geminiShell();
+  results.classList.remove('hidden');
+  const g = $('#gemini');
+  applyGeminiMask(g);
+  fillGeminiPlaceholder();
+  g.classList.add('resting');
 };
 
 const startGemini = () => {
@@ -441,37 +472,81 @@ const startGemini = () => {
   if (!g) {
     return;
   }
-  const metalEl = g.querySelector('.gemini-metal');
-  metalEl.style.maskImage = GEMINI_MASK;
-  metalEl.style.webkitMaskImage = GEMINI_MASK;
+  applyGeminiMask(g);
+  fillGeminiPlaceholder();
   geminiHandle?.destroy();
   geminiHandle = metal(g.querySelector('canvas'), { speed: 0.9, pulse: 0.7 });
-  requestAnimationFrame(() => g.classList.add('in'));
+  if (g.classList.contains('resting')) {
+    // Already on screen as the placeholder — step straight into the shimmer.
+    g.classList.add('in');
+    g.classList.remove('resting');
+  } else {
+    requestAnimationFrame(() => g.classList.add('in'));
+  }
+  // Grey placeholder holds briefly, then the metal shimmer fades in over it.
+  setTimeout(() => g.isConnected && g.classList.add('metal-on'), 700);
 };
 
 const setGeminiLoaded = (report) => {
   const g = $('#gemini');
   $('#gemini-score').textContent = report.overall;
-  $('#gemini-stats').innerHTML = geminiStats(report);
+  $('#gemini-stats').innerHTML = geminiRows(
+    report.categories.map((c) => ({ title: c.title, score: c.score })),
+  );
   geminiHandle?.setSpeed(0.16);
   geminiHandle?.setPulse(0);
   requestAnimationFrame(() => requestAnimationFrame(() => g.classList.add('loaded')));
 };
 
 // --- version C: editorial / typographic (no shader, deliberately restrained) --
+// Smooth score colour: 0 red -> ~33 red/orange -> ~54 yellow -> 75+ green.
+// Interpolates hue across anchor stops so scores blend rather than snapping.
+const lerp = (a, b, t) => a + (b - a) * t;
+const scoreColor = (n) => {
+  const t = Math.max(0, Math.min(100, n));
+  const stops = [
+    [0, 2],
+    [33, 42],
+    [75, 62],
+    [100, 138],
+  ];
+  let hue = stops[stops.length - 1][1];
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const [x0, h0] = stops[i - 1];
+      const [x1, h1] = stops[i];
+      hue = lerp(h0, h1, (t - x0) / (x1 - x0));
+      break;
+    }
+  }
+  return `hsl(${Math.round(hue)} 70% 44%)`;
+};
+
 const edStats = (report) =>
   report.categories
-    .map(
-      (cat, i) =>
-        `<li style="transition-delay:${(0.12 + i * 0.07).toFixed(2)}s"><span class="es-cat">${esc(cat.title)}</span><span class="es-track"><span class="es-fill" style="--w:${cat.score}%"></span></span><span class="es-num">${cat.score}</span></li>`,
-    )
+    .map((cat, i) => {
+      const c = scoreColor(cat.score);
+      return `<li style="transition-delay:${(0.12 + i * 0.07).toFixed(2)}s"><span class="es-cat">${esc(cat.title)}</span><span class="es-track"><span class="es-fill" style="--w:${cat.score}%;background:${c}"></span></span><span class="es-num" style="color:${c}">${cat.score}</span></li>`;
+    })
     .join('');
 
-const countUp = (el, to, ms) => {
+// Placeholder rows reserve the stats height during loading so the hero doesn't
+// jump when the real scores fade in.
+const edStatsPlaceholder = () =>
+  GEMINI_CATS.map(
+    (title) =>
+      `<li><span class="es-cat">${esc(title)}</span><span class="es-track"><span class="es-fill" style="--w:0%"></span></span><span class="es-num">&ndash;</span></li>`,
+  ).join('');
+
+const countUp = (el, to, ms, colorize) => {
   const start = performance.now();
   const tick = (now) => {
     const t = Math.min(1, (now - start) / ms);
-    el.textContent = Math.round(to * (1 - (1 - t) ** 3));
+    const v = Math.round(to * (1 - (1 - t) ** 3));
+    el.textContent = v;
+    if (colorize) {
+      el.style.color = scoreColor(v);
+    }
     if (t < 1) {
       requestAnimationFrame(tick);
     }
@@ -485,7 +560,7 @@ const editorialShell = () => `
       <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
       <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
     </div>
-    <ul class="ed-stats" id="ed-stats"></ul>
+    <ul class="ed-stats" id="ed-stats">${edStatsPlaceholder()}</ul>
   </div>`;
 
 const startEditorial = () => {
@@ -501,8 +576,10 @@ const startEditorial = () => {
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
   $('#ed-stats').innerHTML = edStats(report);
-  countUp($('#ed-num'), report.overall, 900);
-  $('#ed-bar-fill').style.setProperty('--w', `${report.overall}%`);
+  countUp($('#ed-num'), report.overall, 900, true);
+  const bar = $('#ed-bar-fill');
+  bar.style.setProperty('--w', `${report.overall}%`);
+  bar.style.background = scoreColor(report.overall);
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       el.classList.remove('loading');
@@ -520,7 +597,7 @@ const SCORE = {
 };
 let variant = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
 if (!SCORE[variant]) {
-  variant = 'b';
+  variant = 'c';
 }
 const activeScore = () => SCORE[variant];
 let lastReport = null;
@@ -552,7 +629,7 @@ const wireCopy = (report) => {
       sel.addRange(range);
     }
     setTimeout(() => {
-      btn.textContent = 'Copy report as Markdown';
+      btn.textContent = 'Copy as Markdown';
     }, 2200);
   });
 };
@@ -589,7 +666,7 @@ const wireLeadForm = (report) => {
     errEl.classList.add('hidden');
     const btn = $('#lead-btn');
     btn.disabled = true;
-    btn.textContent = 'Unlocking…';
+    btn.textContent = 'Sending…';
     try {
       await fetch('/api/lead', {
         method: 'POST',
@@ -605,10 +682,6 @@ const wireLeadForm = (report) => {
     $('#gate-slot').innerHTML = fullReport(report);
     wireAccordion();
     wireCopy(report);
-    const am = document.querySelector('.agent-metal');
-    if (am) {
-      metal(am, { speed: 0.18, feature: 760 });
-    }
     revealAll();
   });
 };
@@ -624,16 +697,24 @@ $('#analyze-form').addEventListener('submit', async (e) => {
     return;
   }
   errEl.classList.add('hidden');
-  results.innerHTML = activeScore().shell();
-  results.classList.remove('hidden');
+  // Variant A rests a placeholder star on the page; reuse it so it transitions
+  // in place rather than being re-rendered and re-animated.
+  const reuseResting = variant === 'a' && $('#gemini')?.classList.contains('resting');
+  if (!reuseResting) {
+    results.innerHTML = activeScore().shell();
+    results.classList.remove('hidden');
+  }
   activeScore().start();
   btn.disabled = true;
-  const minLoad = new Promise((r) => setTimeout(r, 1200));
+  const minLoad = new Promise((r) => setTimeout(r, 2000));
   const fail = (msg) => {
     geminiHandle?.destroy();
     geminiHandle = null;
     results.innerHTML = '';
     results.classList.add('hidden');
+    if (variant === 'a') {
+      restGemini();
+    }
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
   };
@@ -650,6 +731,9 @@ $('#analyze-form').addEventListener('submit', async (e) => {
     }
     await minLoad;
     renderResults(data);
+    requestAnimationFrame(() =>
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
   } catch {
     fail('Network error. Please try again.');
   } finally {
@@ -668,12 +752,16 @@ const setActiveTab = () => {
     t.classList.toggle('active', t.dataset.v === variant);
     t.setAttribute('aria-selected', t.dataset.v === variant ? 'true' : 'false');
   }
-  // The waist-up llama is a version-B flourish; A and C keep a text-only hero.
+  // The waist-up llama tops the hero for the editorial view (C) and the B preview.
   if (heroRobot) {
-    heroRobot.style.display = variant === 'b' ? 'block' : 'none';
+    heroRobot.style.display = variant === 'b' || variant === 'c' ? 'block' : 'none';
   }
 };
 setActiveTab();
+// Variant A shows a resting placeholder star before any analysis is run.
+if (variant === 'a') {
+  restGemini();
+}
 for (const t of vtabs) {
   t.addEventListener('click', (e) => {
     e.preventDefault();
@@ -685,6 +773,14 @@ for (const t of vtabs) {
     history.replaceState(null, '', `?v=${v}`);
     setActiveTab();
     if (!lastReport) {
+      geminiHandle?.destroy();
+      geminiHandle = null;
+      if (variant === 'a') {
+        restGemini();
+      } else {
+        results.innerHTML = '';
+        results.classList.add('hidden');
+      }
       return;
     }
     // Re-play the reveal in the newly selected style.
