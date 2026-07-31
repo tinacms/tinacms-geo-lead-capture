@@ -674,6 +674,15 @@ const wireLeadForm = (report) => {
         body: JSON.stringify({
           email,
           note: `AI Search Readiness: ${report.finalUrl} scored ${report.overall}/100 (${report.grade}).`,
+          report: {
+            url: report.finalUrl,
+            overall: report.overall,
+            grade: report.grade,
+            passCount: report.passCount,
+            totalScored: report.totalScored,
+            categories: report.categories.map((c) => ({ title: c.title, score: c.score })),
+            topFixes: report.topFixes.map((f) => ({ label: f.label, why: f.why })),
+          },
         }),
       });
     } catch {

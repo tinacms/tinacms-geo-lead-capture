@@ -1,6 +1,9 @@
-// Captures a lead into Mailchimp via its REST API (no SDK, zero deps).
-// Env: MAILCHIMP_API_KEY (form: key-usX), MAILCHIMP_AUDIENCE_ID.
-// The server prefix (usX) is derived from the API key suffix.
+// Captures a lead: adds the email to a Mailchimp audience and sends the report
+// via SendGrid (inline HTML). Both steps are optional — unset env vars just skip
+// that step, so the user's flow never breaks (e.g. in local dev).
+// Env: MAILCHIMP_API_KEY (form key-usX), MAILCHIMP_AUDIENCE_ID,
+//      SENDGRID_API_KEY, LEAD_FROM_EMAIL (defaults to hello@tina.io).
+
 const json = (res, status, body) => {
   res.status(status).setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(body));
@@ -8,33 +11,72 @@ const json = (res, status, body) => {
 
 const isEmail = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return json(res, 405, { error: 'Method not allowed.' });
-  }
+const esc = (s) =>
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
 
-  let email;
-  let note = '';
-  try {
-    const body =
-      typeof req.body === 'object' && req.body ? req.body : JSON.parse(req.body || '{}');
-    email = body.email;
-    note = typeof body.note === 'string' ? body.note.slice(0, 500) : '';
-  } catch {
-    return json(res, 400, { error: 'Invalid request.' });
+// Smooth score colour, matching the app: 0 red -> ~54 yellow -> 75+ green.
+const scoreColor = (n) => {
+  const t = Math.max(0, Math.min(100, Number(n) || 0));
+  const stops = [
+    [0, 2],
+    [33, 42],
+    [75, 62],
+    [100, 138],
+  ];
+  let hue = stops[stops.length - 1][1];
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const [x0, h0] = stops[i - 1];
+      const [x1, h1] = stops[i];
+      hue = h0 + (h1 - h0) * ((t - x0) / (x1 - x0));
+      break;
+    }
   }
-  if (!isEmail(email)) {
-    return json(res, 400, { error: 'Enter a valid email address.' });
-  }
+  return `hsl(${Math.round(hue)},70%,40%)`;
+};
 
+const emailHtml = (r) => {
+  const cats = (r.categories || [])
+    .map(
+      (c) =>
+        `<tr><td style="padding:6px 0;color:#334155;font-size:14px">${esc(c.title)}</td><td style="padding:6px 0;text-align:right;font-weight:700;font-size:14px;color:${scoreColor(c.score)}">${Number(c.score)}</td></tr>`,
+    )
+    .join('');
+  const fixes = (r.topFixes || [])
+    .map(
+      (f) =>
+        `<li style="margin:0 0 10px"><strong style="color:#0f172a">${esc(f.label)}</strong><br><span style="color:#64748b;font-size:14px">${esc(f.why)}</span></li>`,
+    )
+    .join('');
+  return `<!doctype html><html><body style="margin:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:24px 0"><tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">
+      <tr><td style="padding:32px 32px 8px">
+        <p style="margin:0 0 4px;color:#64748b;font-size:12px;letter-spacing:.06em;text-transform:uppercase">AI Search Readiness</p>
+        <h1 style="margin:0;font-size:22px;color:#0f172a">Your report for ${esc(r.url)}</h1>
+      </td></tr>
+      <tr><td style="padding:16px 32px">
+        <span style="font-size:56px;font-weight:800;line-height:1;color:${scoreColor(r.overall)}">${Number(r.overall)}</span><span style="font-size:20px;color:#94a3b8">/100</span>
+        <span style="margin-left:12px;font-size:15px;color:#334155">Grade ${esc(r.grade)} &middot; ${Number(r.passCount)}/${Number(r.totalScored)} checks passed</span>
+      </td></tr>
+      <tr><td style="padding:8px 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cats}</table></td></tr>
+      ${fixes ? `<tr><td style="padding:16px 32px 8px"><h2 style="margin:0 0 12px;font-size:16px;color:#0f172a">Top fixes</h2><ol style="margin:0;padding-left:18px">${fixes}</ol></td></tr>` : ''}
+      <tr><td style="padding:24px 32px 32px"><a href="https://tinacms-geo-lead-capture.vercel.app" style="display:inline-block;background:#d13f13;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px">Re-run the check</a></td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px">Free tool by TinaCMS. You received this because you requested the report.</td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+};
+
+async function addToMailchimp(email, note) {
   const apiKey = process.env.MAILCHIMP_API_KEY;
   const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
   const prefix = apiKey?.split('-')[1];
   if (!apiKey || !audienceId || !prefix) {
-    // Not configured (e.g. local dev). Don't fail the user's flow.
-    return json(res, 200, { ok: true, stored: false });
+    return false;
   }
-
   try {
     const r = await fetch(
       `https://${prefix}.api.mailchimp.com/3.0/lists/${audienceId}/members`,
@@ -47,14 +89,66 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           email_address: email,
           status: 'subscribed',
-          ...(note ? { tags: [], merge_fields: {} } : {}),
+          ...(note ? { merge_fields: {} } : {}),
         }),
       },
     );
-    // 400 with "Member Exists" is a success for our purposes.
-    const ok = r.ok || r.status === 400;
-    return json(res, ok ? 200 : 502, { ok, stored: r.ok });
+    // 400 "Member Exists" still means they're on the list.
+    return r.ok || r.status === 400;
   } catch {
-    return json(res, 200, { ok: true, stored: false });
+    return false;
   }
+}
+
+async function sendReport(email, report) {
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key || !report) {
+    return false;
+  }
+  const from = process.env.LEAD_FROM_EMAIL || 'hello@tina.io';
+  try {
+    const r = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email }] }],
+        from: { email: from, name: 'TinaCMS' },
+        subject: `Your AI Search Readiness report — ${Number(report.overall)}/100`,
+        content: [{ type: 'text/html', value: emailHtml(report) }],
+      }),
+    });
+    return r.ok; // SendGrid returns 202 Accepted
+  } catch {
+    return false;
+  }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return json(res, 405, { error: 'Method not allowed.' });
+  }
+
+  let email;
+  let note = '';
+  let report = null;
+  try {
+    const body =
+      typeof req.body === 'object' && req.body ? req.body : JSON.parse(req.body || '{}');
+    email = body.email;
+    note = typeof body.note === 'string' ? body.note.slice(0, 500) : '';
+    report = body.report && typeof body.report === 'object' ? body.report : null;
+  } catch {
+    return json(res, 400, { error: 'Invalid request.' });
+  }
+  if (!isEmail(email)) {
+    return json(res, 400, { error: 'Enter a valid email address.' });
+  }
+
+  // Both are best-effort — never hold the user's report hostage to a CRM/ESP.
+  const [stored, sent] = await Promise.all([
+    addToMailchimp(email, note),
+    sendReport(email, report),
+  ]);
+
+  return json(res, 200, { ok: true, stored, sent });
 }
