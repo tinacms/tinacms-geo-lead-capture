@@ -568,34 +568,35 @@ export function analyzeHtml(input) {
     ],
   );
 
-  // SSW rule mapping per check. Slugs under ssw.com.au/rules/ — some exist, some
-  // are proposed (see the collation shipped with this feature). Confirm before
-  // launch; unknown slugs resolve to the rule that should be created.
+  // SSW rule mapping per check. Slugs are real rules under ssw.com.au/rules/:
+  // 17 point at existing rules, and 5 (lang, entity, citations, statistics,
+  // quotations) at rules created to back this tool. Verified against the
+  // SSW.Rules.Content repo.
   const SSW = {
-    indexable: ['Do you make sure important pages are indexable?', 'search-engine-indexing'],
-    snippet: ['Do you allow search engines to show snippets?', 'search-engine-indexing'],
-    https: ['Do you use HTTPS everywhere?', 'use-https-everywhere'],
-    canonical: ['Do you use canonical URLs?', 'canonical-urls'],
-    title: ['Do you have meaningful page titles?', 'page-titles'],
-    description: ['Do you write good meta descriptions?', 'meta-descriptions'],
-    h1: ['Do you use a single H1 per page?', 'one-h1-per-page'],
-    headings: ['Do you use semantic heading structure?', 'semantic-headings'],
-    viewport: ['Is your website mobile-friendly?', 'responsive-web-design'],
+    indexable: ['Do you make sure important pages are indexable?', 'page-indexed-by-google'],
+    snippet: ['Do you allow search engines to show snippets?', 'page-indexed-by-google'],
+    https: ['Do you use HTTPS everywhere?', 'do-you-provide-security-to-your-website-visitors'],
+    canonical: ['Do you use canonical URLs?', 'seo-canonical-tags'],
+    title: ['Do you have meaningful page titles?', 'make-title-h1-and-h2-tags-descriptive'],
+    description: ['Do you write good meta descriptions?', 'html-meta-tags'],
+    h1: ['Do you use a single H1 per page?', 'use-heading-tags-h1-h2-h3'],
+    headings: ['Do you use semantic heading structure?', 'use-heading-tags-h1-h2-h3'],
+    viewport: ['Is your website mobile-friendly?', 'responsive-design'],
     lang: ['Do you set the HTML lang attribute?', 'html-lang-attribute'],
-    alt: ['Do you add alt text to images?', 'image-alt-text'],
-    og: ['Do you add Open Graph tags?', 'open-graph-tags'],
+    alt: ['Do you add alt text to images?', 'add-attributes-to-picture-links'],
+    og: ['Do you add Open Graph tags?', 'use-open-graph'],
     jsonld: ['Do you use Schema.org structured data?', 'structured-data'],
     schematypes: ['Do you choose the right Schema.org types?', 'structured-data'],
     entity: ['Do you show authorship and E-E-A-T signals?', 'author-e-e-a-t'],
     citations: ['Do you cite authoritative sources?', 'cite-your-sources'],
     statistics: ['Do you back claims with statistics?', 'back-claims-with-data'],
     quotations: ['Do you include relevant quotations?', 'use-quotations'],
-    scannable: ['Do you make content scannable?', 'scannable-content'],
-    qa: ['Do you use question-based headings?', 'question-based-headings'],
-    freshness: ['Do you show when content was last updated?', 'last-updated-date'],
-    depth: ['Do you write comprehensive content?', 'comprehensive-content'],
-    labels: ['Do you make interactive elements accessible?', 'accessible-controls'],
-    llmstxt: ['Do you understand llms.txt?', 'llms-txt'],
+    scannable: ['Do you make content scannable?', 'web-users-dont-read'],
+    qa: ['Do you use question-based headings?', 'do-you-phrase-the-heading-as-a-question'],
+    freshness: ['Do you show when content was last updated?', 'query-deserves-freshness'],
+    depth: ['Do you write comprehensive content?', 'optimise-content-for-topical-authority'],
+    labels: ['Do you make interactive elements accessible?', 'wcag-compliance'],
+    llmstxt: ['Do you understand llms.txt?', 'make-your-website-llm-friendly'],
   };
   for (const c of categories) {
     for (const ch of c.checks) {

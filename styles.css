@@ -585,11 +585,24 @@ input:focus {
   .big-score-metal {
     height: 10rem;
   }
-  /* Stacked layout: stats sit below the disc, no left offset needed. */
+  /* Stacked layout: stats span the column below the disc. The width slide is a
+     desktop-only effect — !important beats the JS-set inline max-width, and
+     wrapping labels keep the rows inside the viewport. */
   .big-stats,
   .big-score.stats-in .big-stats {
+    max-width: 100% !important;
+    width: 100%;
     margin-left: 0;
-    justify-content: center;
+  }
+  .big-stats li,
+  .bs-d .big-stats li {
+    white-space: normal;
+    gap: 0.9rem;
+    grid-template-columns: 1fr 4.5rem auto;
+  }
+  .big-stats .es-cat {
+    font-size: 0.9rem;
+    line-height: 1.3;
   }
 }
 
@@ -611,6 +624,12 @@ input:focus {
   opacity: 1;
   transform: none;
 }
+/* Resting placeholder sits on screen with no entrance animation. */
+.gemini.resting {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
 .gemini-star {
   position: absolute;
   left: 0;
@@ -625,7 +644,9 @@ input:focus {
 .gemini-metal {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #d9d9df, #8f8f99 45%, #f2f2f6 55%, #7a7a86 72%, #cfcfd6);
+  /* Resting/placeholder: a dark grey lifted from the paper shader's dark band
+     (metal.js color2) — same cool tint, but not near-black. */
+  background: #33333d;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -635,6 +656,41 @@ input:focus {
   display: block;
   width: 100%;
   height: 100%;
+  /* Phase 2: metal shimmer fades in over the solid colour. */
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.gemini.metal-on .gemini-metal canvas,
+.gemini.loaded .gemini-metal canvas {
+  opacity: 1;
+}
+.gemini-q {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 5rem;
+  line-height: 1;
+  color: #f4f6fb;
+  /* Flat placeholder: a soft shadow. The heavy metal-paper shadow below only
+     reads right once the shader is showing. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  opacity: 1;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.gemini.metal-on .gemini-q {
+  text-shadow:
+    0 0 28px rgba(0, 0, 0, 0.6),
+    0 0 16px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 0 4px rgba(0, 0, 0, 0.5);
+}
+.gemini.loaded .gemini-q {
+  opacity: 0;
 }
 .gemini-score {
   position: absolute;
@@ -666,21 +722,14 @@ input:focus {
   padding: 0;
   margin: 0;
 }
+/* Aspects sit in place as placeholders — no flyout. */
 .gemini-stats li {
   position: absolute;
   left: var(--x);
   top: var(--y);
   white-space: nowrap;
   font-size: 1rem;
-  opacity: 0;
-  transform: translateY(-50%) translateX(-16px);
-  transition:
-    opacity 0.5s ease,
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.gemini.loaded .gemini-stats li {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
+  transform: translateY(-50%);
 }
 .gemini-stats .gs-sep {
   margin: 0 0.15rem;
@@ -778,7 +827,9 @@ input:focus {
 }
 .editorial.loaded .ed-bar-fill {
   width: var(--w);
-  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.9s ease;
 }
 @keyframes ed-indeterminate {
   0% {
@@ -848,9 +899,47 @@ input:focus {
   }
 }
 
+/* Version C section-score colours are computed per-score in JS (smooth hue
+   ramp red -> yellow -> green); the es-fill transition eases the reveal. */
+.es-fill {
+  transition: background 0.5s ease;
+}
+
+/* Report header: plain label + Copy-as-Markdown button on the right */
+.report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1.5rem;
+}
+.report-head h2 {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--heading);
+}
+.report-head-text p {
+  color: var(--text-2);
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
+}
+.btn-ghost {
+  color: var(--orange-600);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+}
+.btn-ghost:hover {
+  background: var(--orange-50);
+  border-color: var(--orange);
+}
+
 /* Top fixes */
 .fixes h3 {
-  font-size: 1.05rem;
+  font-size: 1.375rem;
   color: var(--heading);
 }
 
@@ -1174,7 +1263,7 @@ input:focus {
 
 /* Next steps + references */
 .next h3 {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
 }
 
 .tool-grid {
@@ -1440,6 +1529,12 @@ footer.site {
     grid-template-columns: 1fr;
     padding: 1.75rem;
   }
+  /* Stacked: text on top, code below — fade the metal bottom-up so the text
+     keeps its contrast against the dark background. */
+  .agent-metal {
+    -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 55%);
+    mask-image: linear-gradient(to top, #000 0%, transparent 55%);
+  }
 }
 
 /* Liquid-metal border frame */
@@ -1535,66 +1630,68 @@ footer.site {
 }
 
 /* Contact banner with a metal-filled llama */
+/* Bottom callout — matches tina.io's "Talk to a Tina Expert" card:
+   text left, outline llama right, soft white card, orange rounded-rect button. */
 .cta-banner {
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
   gap: 2.5rem;
   margin: clamp(4.5rem, 9vh, 7.5rem) 0 4rem;
-  background: linear-gradient(120deg, var(--seafoam-100), #eaf2ff);
+  background: linear-gradient(135deg, #ffffff, #f3f8ff);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(20, 70, 150, 0.08);
+  padding: clamp(2.25rem, 5vw, 3.5rem);
   overflow: hidden;
 }
 
-/* The photo bleeds flush to the card's bottom edge and rounded corners (via
-   the banner's own overflow:hidden), but keeps a small inset from the top
-   and left edges; the text column keeps the card's full inset padding. */
-.cta-llama-wrap {
-  position: relative;
-  flex-shrink: 0;
-  width: clamp(180px, 26vw, 260px);
-  margin: 1rem 0 0 1rem;
-}
-
-.cta-llama {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
-}
-
 .cta-text {
-  padding: 2.75rem 2.75rem 2.75rem 0;
-}
-
-.cta-text h2 {
-  font-size: clamp(1.5rem, 3vw, 2rem);
-}
-
-.cta-text p {
-  margin-top: 0.85rem;
-  color: var(--text-2);
   max-width: 34rem;
 }
 
-.cta-text .btn {
+.cta-text h2 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  line-height: 1.05;
+  color: var(--heading);
+}
+
+.cta-text p {
+  margin-top: 0.9rem;
+  color: var(--text-2);
+  font-size: 1.125rem;
+  max-width: 30rem;
+}
+
+/* tina.io's CTA button is a 6px rounded rectangle, not the pill used elsewhere */
+.cta-btn {
   margin-top: 1.75rem;
+  border-radius: 6px;
+  padding: 0.7rem 1.5rem;
+}
+
+.cta-llama-outline {
+  flex-shrink: 0;
+  width: clamp(120px, 17vw, 165px);
+  height: auto;
+  align-self: center;
 }
 
 @media (max-width: 640px) {
   .cta-banner {
-    flex-direction: column;
+    flex-direction: column-reverse;
     text-align: center;
+    gap: 1.5rem;
+    padding: 2rem;
   }
-  .cta-text {
-    padding: 0 2rem 2rem;
-  }
-  .cta-text p {
+  .cta-text p,
+  .cta-btn {
     margin-inline: auto;
   }
-  .cta-text .btn {
-    margin-inline: auto;
+  .cta-llama-outline {
+    width: 120px;
   }
 }
 
@@ -1665,7 +1762,7 @@ footer.site {
 /* Fix-subcard link row: docs on the left, SSW rule on the right */
 .link-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 0.6rem 1.25rem;
   flex-wrap: wrap;
