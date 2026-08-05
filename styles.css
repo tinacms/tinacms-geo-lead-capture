@@ -481,7 +481,13 @@ input:focus {
   border-color: var(--orange);
 }
 
-/* Top fixes */
+/* Top fixes -> full report / gate: keep a clear gap between the two sections */
+.post-tease {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3rem, 7vh, 5rem);
+}
+
 .fixes h3 {
   font-size: 1.375rem;
   color: var(--heading);
