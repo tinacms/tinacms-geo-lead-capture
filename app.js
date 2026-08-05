@@ -1,8 +1,6 @@
 // Vanilla renderer for the AI Search Readiness tool. No framework, no build.
 // All text taken from the analyzed page is escaped before it touches innerHTML.
 
-import { metal } from './metal.js';
-
 const $ = (sel) => document.querySelector(sel);
 
 const esc = (s) =>
@@ -189,6 +187,7 @@ const leadGate = (report) => `
       <p>Unlock all ${report.totalScored} checks with the exact fix and the evidence behind each one, plus where to go next. We&rsquo;ll email you a copy.</p>
       <form id="lead-form">
         <input type="email" id="lead-email" placeholder="you@company.com" aria-label="Your email" />
+        <input type="tel" id="lead-phone" placeholder="Phone number" aria-label="Your phone number" autocomplete="tel" />
         <button class="btn" type="submit" id="lead-btn">Send report</button>
       </form>
       <p class="error hidden" id="lead-error"></p>
@@ -197,65 +196,6 @@ const leadGate = (report) => `
   </div>`;
 
 // --- score reveal (replaces the loading spinner + summary card) ---------------
-
-// Metal-masked number: a metal canvas masked to the digits. The site font
-// (IBM Plex) is embedded into the mask SVG — web fonts don't otherwise load
-// inside an SVG used as a CSS mask.
-let maskFontCss = '';
-const maskFontReady = fetch('/fonts/IBMPlexSans-SemiBold.woff2')
-  .then((r) => r.arrayBuffer())
-  .then((buf) => {
-    let bin = '';
-    const bytes = new Uint8Array(buf);
-    for (let i = 0; i < bytes.length; i++) {
-      bin += String.fromCharCode(bytes[i]);
-    }
-    maskFontCss = `@font-face{font-family:'PlexMask';src:url(data:font/woff2;base64,${btoa(bin)}) format('woff2')}`;
-  })
-  .catch(() => {});
-
-const scoreMaskUri = (n) => {
-  const t = String(n);
-  const y = 0.54;
-  const H = 100;
-  const W = t.length * 54 + 18;
-  const style = maskFontCss ? `<style>${maskFontCss}</style>` : '';
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${H}'><defs>${style}</defs><text x='${W / 2}' y='${H * y}' text-anchor='middle' dominant-baseline='central' font-family='PlexMask, "IBM Plex Sans", Arial, sans-serif' font-weight='600' font-size='${H * 0.9}' fill='#fff'>${esc(t)}</text></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-};
-
-// Set both prefixed and unprefixed mask props (Safari still needs -webkit-).
-const setMask = (el, image, size, position) => {
-  el.style.maskImage = image;
-  el.style.webkitMaskImage = image;
-  el.style.maskSize = size;
-  el.style.webkitMaskSize = size;
-  el.style.maskPosition = position;
-  el.style.webkitMaskPosition = position;
-  el.style.maskRepeat = 'no-repeat';
-  el.style.webkitMaskRepeat = 'no-repeat';
-};
-
-// The stats list starts at max-width 0 (zero footprint) so the disc sits
-// dead-centre while loading; on load it eases out to its measured width and
-// the flex row re-centres the whole group, sliding the disc left smoothly.
-// Then the disc fades out to the metal-masked number, and an ink layer inside
-// the same mask slowly fades the metal to black.
-// `orange` renders the D variant: same reveal, plus the "Overall score" label
-// and D-only styling hooks (.bs-d) so B keeps its original look.
-const bigScoreShell = (orange = false) => `
-  <div class="big-score loading${orange ? ' bs-d' : ''}" id="big-score">
-    <div class="bs-metal-col">
-      <div class="big-score-metal" id="score-metal">
-        <div class="bs-num" id="bs-num">
-          <div class="bs-num-in"><canvas></canvas><i class="bs-ink"></i></div>
-        </div>
-        <div class="bs-disc"><canvas></canvas></div>
-      </div>
-      ${orange ? '<span class="bs-label">Overall score</span>' : ''}
-    </div>
-    <ul class="big-stats" id="big-stats"></ul>
-  </div>`;
 
 // --- interaction --------------------------------------------------------------
 
@@ -303,105 +243,9 @@ window.addEventListener(
   { passive: true },
 );
 
-let geminiHandle = null;
-
-const startBigScore = () => {
-  const box = $('#score-metal');
-  if (!box) {
-    return;
-  }
-  geminiHandle?.destroy();
-  // Fast pulsing metal on the disc while loading; the number's canvas mirrors
-  // the disc's clock so both render the same metal pattern. Orphaned instances
-  // self-clean when their canvas leaves the DOM.
-  geminiHandle = metal(box.querySelector('.bs-disc canvas'), { speed: 0.9, pulse: 0.7 });
-  metal(box.querySelector('.bs-num canvas'), { sync: geminiHandle });
-  requestAnimationFrame(() => $('#big-score').classList.add('in'));
-};
-
-const setBigScoreLoaded = async (report) => {
-  const bs = $('#big-score');
-  const ul = $('#big-stats');
-  // Same rows as version C: label | track bar | number.
-  ul.innerHTML = edStats(report);
-  // Measure the list's natural width so the slide eases to the exact target —
-  // easing toward an oversized max-width cap cuts the visible motion off
-  // mid-curve, which reads as no easing at all.
-  ul.style.maxWidth = 'none';
-  const statsW = ul.offsetWidth;
-  ul.style.maxWidth = '';
-  await maskFontReady;
-  // Digits sized to sit within the square box ("100" is the widest case),
-  // centred so the visible number aligns with the stats beside it. --dh lets
-  // D's label hug the digits' real bottom edge, whatever the digit count.
-  const q = [0, 80, 78, 55][String(report.overall).length] || 55;
-  $('.bs-metal-col').style.setProperty('--dh', `${q / 2}%`);
-  setMask($('#bs-num .bs-num-in'), scoreMaskUri(report.overall), `auto ${q}%`, 'center');
-  geminiHandle?.setSpeed(0.16);
-  geminiHandle?.setPulse(0);
-  // Phase 1: stats ease in and the group re-centres (disc slides left).
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      bs.classList.remove('loading');
-      bs.classList.add('stats-in');
-      ul.style.maxWidth = `${statsW}px`;
-    }),
-  );
-  // Phase 2 (CSS): disc fades out to the metal number, which then inks to black.
-  setTimeout(() => bs.classList.add('loaded'), 750);
-};
-
-// --- version A: gemini star (kept for the stakeholder A/B/C preview) ----------
-// Four-point "gemini" spark: sharp tips with concave sides bowing inward.
-const geminiPath = (() => {
-  const c = 150;
-  const R = 148;
-  const d = 0.2 * R;
-  const N = `${c},${c - R}`;
-  const E = `${c + R},${c}`;
-  const S = `${c},${c + R}`;
-  const W = `${c - R},${c}`;
-  const ne = `${c + d},${c - d}`;
-  const se = `${c + d},${c + d}`;
-  const sw = `${c - d},${c + d}`;
-  const nw = `${c - d},${c - d}`;
-  return `M${N} Q${ne} ${E} Q${se} ${S} Q${sw} ${W} Q${nw} ${N}Z`;
-})();
-
-const GEMINI_MASK = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'><path d='${geminiPath}' fill='#fff'/></svg>`,
-)}")`;
-
-const geminiShell = () => `
-  <div class="gemini" id="gemini">
-    <div class="gemini-star">
-      <div class="gemini-metal"><canvas></canvas></div>
-      <div class="gemini-q" aria-hidden="true">&ndash;</div>
-      <div class="gemini-score" id="gemini-score"></div>
-    </div>
-    <ul class="gemini-stats" id="gemini-stats"></ul>
-  </div>`;
-
-// A point on the star's right silhouette (N -> E -> S), used to hug the stats.
-const geminiRightEdge = (() => {
-  const N = [150, 2];
-  const E = [298, 150];
-  const S = [150, 298];
-  const ne = [179.6, 120.4];
-  const se = [179.6, 179.6];
-  const q = (p0, cp, p2, t) => {
-    const u = 1 - t;
-    return [
-      u * u * p0[0] + 2 * u * t * cp[0] + t * t * p2[0],
-      u * u * p0[1] + 2 * u * t * cp[1] + t * t * p2[1],
-    ];
-  };
-  return (s) => (s < 0.5 ? q(N, ne, E, s * 2) : q(E, se, S, (s - 0.5) * 2));
-})();
-
-// The five aspects are fixed, so we can lay them out as placeholders before any
+// The five aspects are fixed, so we lay them out as placeholders before any
 // analysis has run.
-const GEMINI_CATS = [
+const CAT_TITLES = [
   'AI eligibility & crawlability',
   'Search fundamentals',
   'Structured data & entities',
@@ -409,96 +253,7 @@ const GEMINI_CATS = [
   'Agentic web readiness',
 ];
 
-// Positions each aspect row against the star's right silhouette. Each row is
-// { title, score }; score is a number, or '–' as a placeholder. No flyout — the
-// rows just sit where they land.
-const geminiRows = (rows) => {
-  const n = rows.length;
-  const samples = [];
-  for (let k = 0; k <= 240; k++) {
-    samples.push(geminiRightEdge(k / 240));
-  }
-  const edgeX = (y) => {
-    let bx = 0;
-    let bd = Infinity;
-    for (const [x, sy] of samples) {
-      const dd = Math.abs(sy - y);
-      if (dd < bd) {
-        bd = dd;
-        bx = x;
-      }
-    }
-    return bx;
-  };
-  const top = 40;
-  const bottom = 260;
-  const gap = 52;
-  return rows
-    .map((r, i) => {
-      const y = top + (i / (n - 1)) * (bottom - top);
-      const x = edgeX(y) + gap;
-      return `<li style="--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px"><span class="gs-cat">${esc(r.title)}</span> <span class="gs-sep">|</span> <span class="gs-num">${r.score}</span></li>`;
-    })
-    .join('');
-};
-
-// Fill the stats list with the fixed aspect titles and a single dash each.
-const fillGeminiPlaceholder = () => {
-  const el = $('#gemini-stats');
-  if (el && !el.children.length) {
-    el.innerHTML = geminiRows(GEMINI_CATS.map((title) => ({ title, score: '–' })));
-  }
-};
-
-const applyGeminiMask = (g) => {
-  const m = g.querySelector('.gemini-metal');
-  m.style.maskImage = GEMINI_MASK;
-  m.style.webkitMaskImage = GEMINI_MASK;
-};
-
-// Resting placeholder shown before analysis: solid star with a dash for the
-// score and each aspect, no shader, no entrance animation.
-const restGemini = () => {
-  results.innerHTML = geminiShell();
-  results.classList.remove('hidden');
-  const g = $('#gemini');
-  applyGeminiMask(g);
-  fillGeminiPlaceholder();
-  g.classList.add('resting');
-};
-
-const startGemini = () => {
-  const g = $('#gemini');
-  if (!g) {
-    return;
-  }
-  applyGeminiMask(g);
-  fillGeminiPlaceholder();
-  geminiHandle?.destroy();
-  geminiHandle = metal(g.querySelector('canvas'), { speed: 0.9, pulse: 0.7 });
-  if (g.classList.contains('resting')) {
-    // Already on screen as the placeholder — step straight into the shimmer.
-    g.classList.add('in');
-    g.classList.remove('resting');
-  } else {
-    requestAnimationFrame(() => g.classList.add('in'));
-  }
-  // Grey placeholder holds briefly, then the metal shimmer fades in over it.
-  setTimeout(() => g.isConnected && g.classList.add('metal-on'), 700);
-};
-
-const setGeminiLoaded = (report) => {
-  const g = $('#gemini');
-  $('#gemini-score').textContent = report.overall;
-  $('#gemini-stats').innerHTML = geminiRows(
-    report.categories.map((c) => ({ title: c.title, score: c.score })),
-  );
-  geminiHandle?.setSpeed(0.16);
-  geminiHandle?.setPulse(0);
-  requestAnimationFrame(() => requestAnimationFrame(() => g.classList.add('loaded')));
-};
-
-// --- version C: editorial / typographic (no shader, deliberately restrained) --
+// --- editorial score view: typographic, no shader --------------------------
 // Smooth score colour: 0 red -> ~33 red/orange -> ~54 yellow -> 75+ green.
 // Interpolates hue across anchor stops so scores blend rather than snapping.
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -533,7 +288,7 @@ const edStats = (report) =>
 // Placeholder rows reserve the stats height during loading so the hero doesn't
 // jump when the real scores fade in.
 const edStatsPlaceholder = () =>
-  GEMINI_CATS.map(
+  CAT_TITLES.map(
     (title) =>
       `<li><span class="es-cat">${esc(title)}</span><span class="es-track"><span class="es-fill" style="--w:0%"></span></span><span class="es-num">&ndash;</span></li>`,
   ).join('');
@@ -568,8 +323,6 @@ const startEditorial = () => {
   if (!el) {
     return;
   }
-  geminiHandle?.destroy();
-  geminiHandle = null;
   requestAnimationFrame(() => el.classList.add('in'));
 };
 
@@ -588,19 +341,12 @@ const setEditorialLoaded = (report) => {
   );
 };
 
-// --- version registry: A/B/C differ only in the score hero --------------------
-const SCORE = {
-  a: { id: 'gemini', shell: geminiShell, start: startGemini, loaded: setGeminiLoaded },
-  b: { id: 'big-score', shell: bigScoreShell, start: startBigScore, loaded: setBigScoreLoaded },
-  c: { id: 'editorial', shell: editorialShell, start: startEditorial, loaded: setEditorialLoaded },
-  d: { id: 'big-score', shell: () => bigScoreShell(true), start: startBigScore, loaded: setBigScoreLoaded },
-};
-let variant = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
-if (!SCORE[variant]) {
-  variant = 'c';
-}
-const activeScore = () => SCORE[variant];
+const urlParams = new URLSearchParams(location.search);
 let lastReport = null;
+// Deep-link from the report email: ?url=<page>&full=1 auto-runs the check and
+// shows the full report ungated (the recipient already gave us their email).
+const presetUrl = urlParams.get('url');
+const autoFull = urlParams.get('full') === '1';
 
 const wireAccordion = () => {
   results.querySelectorAll('.check-btn').forEach((btn) => {
@@ -636,17 +382,22 @@ const wireCopy = (report) => {
 
 const renderResults = (report) => {
   lastReport = report;
-  const s = activeScore();
-  s.loaded(report);
+  setEditorialLoaded(report);
   document
-    .getElementById(s.id)
+    .getElementById('editorial')
     .insertAdjacentHTML(
       'afterend',
-      `<div class="post-tease" id="post-tease">${topFixes(report)}<div id="gate-slot">${leadGate(report)}</div></div>`,
+      `<div class="post-tease" id="post-tease">${topFixes(report)}<div id="gate-slot">${autoFull ? fullReport(report) : leadGate(report)}</div></div>`,
     );
   revealAll();
   armScrollHint();
-  wireLeadForm(report);
+  if (autoFull) {
+    // Arrived via the email deep-link — skip the gate, show the full report.
+    wireAccordion();
+    wireCopy(report);
+  } else {
+    wireLeadForm(report);
+  }
 };
 
 const wireLeadForm = (report) => {
@@ -657,9 +408,15 @@ const wireLeadForm = (report) => {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = $('#lead-email').value.trim();
+    const phone = $('#lead-phone').value.trim();
     const errEl = $('#lead-error');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errEl.textContent = 'Enter a valid email address.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    if ((phone.match(/\d/g) || []).length < 6) {
+      errEl.textContent = 'Enter a valid phone number.';
       errEl.classList.remove('hidden');
       return;
     }
@@ -673,6 +430,8 @@ const wireLeadForm = (report) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
+          phone,
+          website: report.finalUrl,
           note: `AI Search Readiness: ${report.finalUrl} scored ${report.overall}/100 (${report.grade}).`,
           report: {
             url: report.finalUrl,
@@ -706,24 +465,14 @@ $('#analyze-form').addEventListener('submit', async (e) => {
     return;
   }
   errEl.classList.add('hidden');
-  // Variant A rests a placeholder star on the page; reuse it so it transitions
-  // in place rather than being re-rendered and re-animated.
-  const reuseResting = variant === 'a' && $('#gemini')?.classList.contains('resting');
-  if (!reuseResting) {
-    results.innerHTML = activeScore().shell();
-    results.classList.remove('hidden');
-  }
-  activeScore().start();
+  results.innerHTML = editorialShell();
+  results.classList.remove('hidden');
+  startEditorial();
   btn.disabled = true;
   const minLoad = new Promise((r) => setTimeout(r, 2000));
   const fail = (msg) => {
-    geminiHandle?.destroy();
-    geminiHandle = null;
     results.innerHTML = '';
     results.classList.add('hidden');
-    if (variant === 'a') {
-      restGemini();
-    }
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
   };
@@ -752,50 +501,9 @@ $('#analyze-form').addEventListener('submit', async (e) => {
 
 revealAll();
 
-// A/B/C version switcher (stakeholder preview). Tabs swap the score hero live;
-// if a report is already on screen it re-plays the reveal in the new style.
-const vtabs = Array.from(document.querySelectorAll('.vtab'));
-const heroRobot = document.querySelector('.hero-robot');
-const setActiveTab = () => {
-  for (const t of vtabs) {
-    t.classList.toggle('active', t.dataset.v === variant);
-    t.setAttribute('aria-selected', t.dataset.v === variant ? 'true' : 'false');
-  }
-  // The waist-up llama tops the hero for the editorial view (C) and the B preview.
-  if (heroRobot) {
-    heroRobot.style.display = variant === 'b' || variant === 'c' ? 'block' : 'none';
-  }
-};
-setActiveTab();
-// Variant A shows a resting placeholder star before any analysis is run.
-if (variant === 'a') {
-  restGemini();
-}
-for (const t of vtabs) {
-  t.addEventListener('click', (e) => {
-    e.preventDefault();
-    const v = t.dataset.v;
-    if (v === variant || !SCORE[v]) {
-      return;
-    }
-    variant = v;
-    history.replaceState(null, '', `?v=${v}`);
-    setActiveTab();
-    if (!lastReport) {
-      geminiHandle?.destroy();
-      geminiHandle = null;
-      if (variant === 'a') {
-        restGemini();
-      } else {
-        results.innerHTML = '';
-        results.classList.add('hidden');
-      }
-      return;
-    }
-    // Re-play the reveal in the newly selected style.
-    results.innerHTML = activeScore().shell();
-    results.classList.remove('hidden');
-    activeScore().start();
-    setTimeout(() => renderResults(lastReport), 850);
-  });
+// Deep-link: if a ?url= was passed (from the report email), prefill and run it.
+if (presetUrl) {
+  const input = $('#url');
+  input.value = presetUrl;
+  requestAnimationFrame(() => $('#analyze-form').requestSubmit());
 }

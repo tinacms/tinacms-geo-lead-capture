@@ -64,7 +64,7 @@ const emailHtml = (r) => {
       </td></tr>
       <tr><td style="padding:8px 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cats}</table></td></tr>
       ${fixes ? `<tr><td style="padding:16px 32px 8px"><h2 style="margin:0 0 12px;font-size:16px;color:#0f172a">Top fixes</h2><ol style="margin:0;padding-left:18px">${fixes}</ol></td></tr>` : ''}
-      <tr><td style="padding:24px 32px 32px"><a href="https://tinacms-geo-lead-capture.vercel.app" style="display:inline-block;background:#d13f13;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px">Re-run the check</a></td></tr>
+      <tr><td style="padding:24px 32px 32px"><a href="https://tinacms-geo-lead-capture.vercel.app/?url=${encodeURIComponent(r.url || '')}&full=1" style="display:inline-block;background:#d13f13;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px">See your full report</a></td></tr>
       <tr><td style="padding:16px 32px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px">Free tool by TinaCMS. You received this because you requested the report.</td></tr>
     </table>
   </td></tr></table></body></html>`;
@@ -105,19 +105,62 @@ async function sendReport(email, report) {
   if (!key || !report) {
     return false;
   }
-  const from = process.env.LEAD_FROM_EMAIL || 'hello@tina.io';
+  // Falls back to tina.io's own SendGrid sender var so it works with that env as-is.
+  const from = process.env.LEAD_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || 'info@tina.io';
+  const fromName = process.env.LEAD_FROM_NAME || 'The TinaCMS Team';
+  const replyTo = process.env.LEAD_REPLY_TO;
   try {
     const r = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         personalizations: [{ to: [{ email }] }],
-        from: { email: from, name: 'TinaCMS' },
+        from: { email: from, name: fromName },
+        ...(replyTo ? { reply_to: { email: replyTo } } : {}),
         subject: `Your AI Search Readiness report — ${Number(report.overall)}/100`,
         content: [{ type: 'text/html', value: emailHtml(report) }],
       }),
     });
     return r.ok; // SendGrid returns 202 Accepted
+  } catch {
+    return false;
+  }
+}
+
+// HubSpot Forms API — no auth needed, just Portal ID + Form GUID. Submits the
+// lead with a source marker so sales can segment this campaign (see README/notes).
+// email/phone/website are standard HubSpot contact properties; `lead_source` is
+// a custom property to create in HubSpot (or rename to an existing one).
+async function sendToHubspot(email, phone, website) {
+  const portalId = process.env.HUBSPOT_PORTAL_ID;
+  const formGuid = process.env.HUBSPOT_FORM_GUID;
+  if (!portalId || !formGuid) {
+    return false;
+  }
+  const fields = [{ name: 'email', value: email }];
+  if (phone) {
+    fields.push({ name: 'phone', value: phone });
+  }
+  if (website) {
+    fields.push({ name: 'website', value: website });
+  }
+  fields.push({ name: 'lead_source', value: 'AI Search Readiness Tool' });
+  try {
+    const r = await fetch(
+      `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields,
+          context: {
+            pageUri: 'https://tinacms-geo-lead-capture.vercel.app',
+            pageName: 'AI Search Readiness',
+          },
+        }),
+      },
+    );
+    return r.ok;
   } catch {
     return false;
   }
@@ -131,12 +174,16 @@ export default async function handler(req, res) {
   let email;
   let note = '';
   let report = null;
+  let phone = '';
+  let website = '';
   try {
     const body =
       typeof req.body === 'object' && req.body ? req.body : JSON.parse(req.body || '{}');
     email = body.email;
     note = typeof body.note === 'string' ? body.note.slice(0, 500) : '';
     report = body.report && typeof body.report === 'object' ? body.report : null;
+    phone = typeof body.phone === 'string' ? body.phone.slice(0, 40) : '';
+    website = typeof body.website === 'string' ? body.website.slice(0, 300) : '';
   } catch {
     return json(res, 400, { error: 'Invalid request.' });
   }
@@ -144,11 +191,12 @@ export default async function handler(req, res) {
     return json(res, 400, { error: 'Enter a valid email address.' });
   }
 
-  // Both are best-effort — never hold the user's report hostage to a CRM/ESP.
-  const [stored, sent] = await Promise.all([
+  // All best-effort — never hold the user's report hostage to a CRM/ESP.
+  const [stored, sent, hubspot] = await Promise.all([
     addToMailchimp(email, note),
     sendReport(email, report),
+    sendToHubspot(email, phone, website),
   ]);
 
-  return json(res, 200, { ok: true, stored, sent });
+  return json(res, 200, { ok: true, stored, sent, hubspot });
 }
