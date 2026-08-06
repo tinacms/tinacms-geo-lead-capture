@@ -127,40 +127,46 @@ async function sendReport(email, report) {
   }
 }
 
-// HubSpot Forms API — no auth needed, just Portal ID + Form GUID. Submits the
-// lead with a source marker so sales can segment this campaign (see README/notes).
-// email/phone/website are standard HubSpot contact properties; `lead_source` is
-// a custom property to create in HubSpot (or rename to an existing one).
+// HubSpot — accepts EITHER credential an admin can provide:
+//   1. HUBSPOT_TOKEN  -> Private App/Service Key token, Contacts API upsert (preferred)
+//   2. HUBSPOT_PORTAL_ID + HUBSPOT_FORM_GUID -> Forms API no-auth submit
+// Whichever env is set wins; unset = skip cleanly. Idempotent by email.
+// The analysed URL goes in the custom `analyzed_url` property (NOT the standard
+// `website`, which HubSpot uses to auto-associate a Company). `lead_source`
+// marks the campaign for sales segmentation.
 async function sendToHubspot(email, phone, website) {
+  const token = process.env.HUBSPOT_TOKEN;
   const portalId = process.env.HUBSPOT_PORTAL_ID;
   const formGuid = process.env.HUBSPOT_FORM_GUID;
-  if (!portalId || !formGuid) {
-    return false;
-  }
-  const fields = [{ name: 'email', value: email }];
-  if (phone) {
-    fields.push({ name: 'phone', value: phone });
-  }
-  if (website) {
-    fields.push({ name: 'website', value: website });
-  }
-  fields.push({ name: 'lead_source', value: 'AI Search Readiness Tool' });
   try {
-    const r = await fetch(
-      `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`,
-      {
+    if (token) {
+      const properties = { email, lead_source: 'AI Search Readiness Tool' };
+      if (phone) properties.phone = phone;
+      if (website) properties.analyzed_url = website;
+      const r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/batch/upsert', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields,
-          context: {
-            pageUri: 'https://tinacms-geo-lead-capture.vercel.app',
-            pageName: 'AI Search Readiness',
-          },
-        }),
-      },
-    );
-    return r.ok;
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: [{ idProperty: 'email', id: email, properties }] }),
+      });
+      return r.ok;
+    }
+    if (portalId && formGuid) {
+      const fields = [{ name: 'email', value: email }];
+      if (phone) fields.push({ name: 'phone', value: phone });
+      const r = await fetch(
+        `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields,
+            context: { pageName: 'AI Search Readiness' },
+          }),
+        },
+      );
+      return r.ok;
+    }
+    return false;
   } catch {
     return false;
   }
