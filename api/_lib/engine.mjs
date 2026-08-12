@@ -190,9 +190,13 @@ export function analyzeHtml(input) {
   const imgsWithAlt = imgs.filter((t) => /alt=["'][^"']+["']/i.test(t));
   const lists = (html.match(/<(ul|ol|table)\b/gi) ?? []).length;
   const blockquotes = (html.match(/<blockquote\b/gi) ?? []).length;
+  // Percentages, currency, large formatted numbers, and decimals with a unit
+  // word. Bare 4-digit years are deliberately excluded: copyright/footer years
+  // (© 2024) are noise, not statistics, and used to hand out free credit.
   const statMatches =
-    body.match(/\d+(\.\d+)?\s?%|\$\s?\d|\b\d{1,3}(,\d{3})+\b|\b(19|20)\d{2}\b/g) ??
-    [];
+    body.match(
+      /\d+(\.\d+)?\s?%|\$\s?\d|\b\d{1,3}(,\d{3})+\b|\b\d+(\.\d+)?\s?(million|billion|trillion|thousand|k|x|percent)\b/gi,
+    ) ?? [];
   const qaHeadings = hs.filter(
     (h) =>
       h.text.includes('?') ||
@@ -391,9 +395,17 @@ export function analyzeHtml(input) {
   );
 
   // 3. Structured data & E-E-A-T ----------------------------------------------
-  const hasEntity = types.some((t) =>
-    /Organization|Person|Author|Article|NewsArticle|BlogPosting/i.test(t),
+  // Two distinct signals (previously one boolean, double-counted):
+  //  - hasSchemaType: did the page pick a recognized, page-appropriate type?
+  //  - hasAuthorEntity: is authorship/publisher declared (the E-E-A-T signal)?
+  const hasSchemaType = types.some((t) =>
+    /Article|NewsArticle|BlogPosting|Product|FAQPage|HowTo|Recipe|Event|Organization|LocalBusiness|WebSite|WebPage|BreadcrumbList|Review|Person|VideoObject|Course/i.test(
+      t,
+    ),
   );
+  const hasAuthorEntity =
+    types.some((t) => /Organization|Person|LocalBusiness/i.test(t)) ||
+    /"author"\s*:/i.test(html);
   add(
     'structured',
     'Structured data & entities',
@@ -416,10 +428,10 @@ export function analyzeHtml(input) {
       {
         id: 'schematypes',
         label: 'Relevant schema types',
-        status: hasEntity ? 'pass' : 'warn',
-        detail: hasEntity
-          ? 'Recognized content/entity types are declared.'
-          : 'No Article/Organization/Person-style types detected.',
+        status: hasSchemaType ? 'pass' : 'warn',
+        detail: hasSchemaType
+          ? 'Recognized, page-appropriate schema types are declared.'
+          : 'No recognized content type (Article, Product, FAQPage, Organization…) detected.',
         fix: 'Use the schema type that fits the page (Article, Product, FAQPage, Organization).',
         why: 'Matching types unlock the right rich results and clarify what the page is.',
         weight: 3,
@@ -428,10 +440,10 @@ export function analyzeHtml(input) {
       {
         id: 'entity',
         label: 'Author / organization identified',
-        status: hasEntity ? 'pass' : 'warn',
-        detail: hasEntity
-          ? 'An Organization, Person or Author entity is present.'
-          : 'No clear author or organization entity in markup.',
+        status: hasAuthorEntity ? 'pass' : 'warn',
+        detail: hasAuthorEntity
+          ? 'An author or publishing organization is declared in markup.'
+          : 'No author or organization entity in markup.',
         fix: 'Declare the author (Person) and publisher (Organization) to support E-E-A-T.',
         why: 'Clear authorship supports experience, expertise, authority and trust signals.',
         weight: 3,
