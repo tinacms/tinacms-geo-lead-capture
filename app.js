@@ -425,7 +425,7 @@ const wireLeadForm = (report) => {
     btn.disabled = true;
     btn.textContent = 'Sending…';
     try {
-      await fetch('/api/lead', {
+      await fetch('/geo/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -477,7 +477,7 @@ $('#analyze-form').addEventListener('submit', async (e) => {
     errEl.classList.remove('hidden');
   };
   try {
-    const res = await fetch('/api/analyze', {
+    const res = await fetch('/geo/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),

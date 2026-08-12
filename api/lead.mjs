@@ -11,6 +11,9 @@ const json = (res, status, body) => {
 
 const isEmail = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
+// Public URL the tool is served from (behind tina.io's /geo proxy in prod).
+const appUrl = () => (process.env.APP_URL || 'https://tina.io/geo').replace(/\/$/, '');
+
 const esc = (s) =>
   String(s ?? '').replace(
     /[&<>"']/g,
@@ -64,7 +67,7 @@ const emailHtml = (r) => {
       </td></tr>
       <tr><td style="padding:8px 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cats}</table></td></tr>
       ${fixes ? `<tr><td style="padding:16px 32px 8px"><h2 style="margin:0 0 12px;font-size:16px;color:#0f172a">Top fixes</h2><ol style="margin:0;padding-left:18px">${fixes}</ol></td></tr>` : ''}
-      <tr><td style="padding:24px 32px 32px"><a href="https://tinacms-geo-lead-capture.vercel.app/?url=${encodeURIComponent(r.url || '')}&full=1" style="display:inline-block;background:#d13f13;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px">See your full report</a></td></tr>
+      <tr><td style="padding:24px 32px 32px"><a href="${appUrl()}/?url=${encodeURIComponent(r.url || '')}&full=1" style="display:inline-block;background:#d13f13;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px">See your full report</a></td></tr>
       <tr><td style="padding:16px 32px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px">Free tool by TinaCMS. You received this because you requested the report.</td></tr>
     </table>
   </td></tr></table></body></html>`;
@@ -106,7 +109,7 @@ async function sendReport(email, report) {
     return false;
   }
   // Falls back to tina.io's own SendGrid sender var so it works with that env as-is.
-  const from = process.env.LEAD_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || 'info@tina.io';
+  const from = process.env.LEAD_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || 'sophiebelle@ssw.com.au';
   const fromName = process.env.LEAD_FROM_NAME || 'The TinaCMS Team';
   const replyTo = process.env.LEAD_REPLY_TO;
   try {
