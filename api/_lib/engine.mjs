@@ -46,7 +46,148 @@ const E = {
     source: 'Semrush',
     url: 'https://www.semrush.com/blog/answer-engine-optimization/',
   },
+  openaiBots: {
+    type: 'official',
+    source: 'OpenAI, bot documentation',
+    url: 'https://developers.openai.com/api/docs/bots',
+  },
+  anthropicBots: {
+    type: 'official',
+    source: 'Anthropic, crawler documentation',
+    url: 'https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler',
+  },
+  googleExtended: {
+    type: 'official',
+    source: 'Google Search Central',
+    url: 'https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers',
+  },
+  cloudflareAgent: {
+    type: 'experimental',
+    source: 'Cloudflare, Agent Readiness score',
+    url: 'https://blog.cloudflare.com/agent-readiness/',
+  },
+  contentSignals: {
+    type: 'experimental',
+    source: 'Content Signals Policy',
+    url: 'https://contentsignals.org/',
+  },
 };
+
+// --- robots.txt ---------------------------------------------------------------
+
+// Bots that fetch a page in order to answer a user or build a search index.
+// Blocking one of these costs citations, so it is scored.
+const RETRIEVAL_BOTS = [
+  'OAI-SearchBot',
+  'Claude-User',
+  'Claude-SearchBot',
+  'PerplexityBot',
+  'Bingbot',
+];
+
+// Bots that collect content for model training. Blocking these is a licensing
+// decision, not a defect, so it is reported and never scored.
+const TRAINING_BOTS = [
+  'GPTBot',
+  'ClaudeBot',
+  'Google-Extended',
+  'CCBot',
+  'Applebot-Extended',
+  'meta-externalagent',
+  'Bytespider',
+];
+
+/**
+ * Parse robots.txt into user-agent groups plus the non-group directives we care
+ * about. Follows RFC 9309 grouping: consecutive User-agent lines share the rules
+ * that follow, and the next User-agent after a rule opens a new group.
+ */
+export function parseRobots(text) {
+  const groups = [];
+  const sitemaps = [];
+  let contentSignal = null;
+  let current = null;
+  let collectingAgents = false;
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*$/, '').trim();
+    const colon = line.indexOf(':');
+    if (colon < 0) {
+      continue;
+    }
+    const field = line.slice(0, colon).trim().toLowerCase();
+    const value = line.slice(colon + 1).trim();
+
+    if (field === 'user-agent') {
+      if (!collectingAgents) {
+        current = { agents: [], rules: [] };
+        groups.push(current);
+        collectingAgents = true;
+      }
+      if (value) {
+        current.agents.push(value.toLowerCase());
+      }
+    } else if (field === 'allow' || field === 'disallow') {
+      collectingAgents = false;
+      if (!current) {
+        current = { agents: ['*'], rules: [] };
+        groups.push(current);
+      }
+      // An empty value is not a rule: "Disallow:" means nothing is disallowed,
+      // which is already the default when a group has no rules.
+      if (value) {
+        current.rules.push({ allow: field === 'allow', path: value });
+      }
+    } else if (field === 'sitemap' && value) {
+      sitemaps.push(value);
+    } else if (field === 'content-signal' && value) {
+      contentSignal = value;
+    }
+  }
+  return { groups, sitemaps, contentSignal };
+}
+
+// robots.txt paths support * as a wildcard and a trailing $ as an end anchor.
+const ruleMatches = (pattern, path) => {
+  const anchored = pattern.endsWith('$');
+  const body = anchored ? pattern.slice(0, -1) : pattern;
+  const re = new RegExp(
+    `^${body.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}${anchored ? '$' : ''}`,
+  );
+  return re.test(path);
+};
+
+/**
+ * Is `agent` allowed to fetch `path`? Google's precedence: the most specific
+ * user-agent group wins (falling back to *), then within that group the longest
+ * matching rule wins, with Allow beating Disallow on a tie.
+ */
+export function isAllowed(robots, agent, path) {
+  if (!robots) {
+    return true;
+  }
+  const name = agent.toLowerCase();
+  const group =
+    robots.groups.find((g) => g.agents.includes(name)) ??
+    robots.groups.find((g) => g.agents.includes('*'));
+  if (!group) {
+    return true;
+  }
+  let best = null;
+  for (const rule of group.rules) {
+    if (!ruleMatches(rule.path, path)) {
+      continue;
+    }
+    if (
+      !best ||
+      rule.path.length > best.path.length ||
+      (rule.path.length === best.path.length && rule.allow)
+    ) {
+      best = rule;
+    }
+  }
+  return best ? best.allow : true;
+}
 
 // --- tiny HTML extraction helpers (regex, deliberately narrow) ---------------
 
@@ -163,6 +304,10 @@ const externalDomains = (html, pageUrl) => {
 const GRADE = (n) =>
   n >= 90 ? 'A' : n >= 75 ? 'B' : n >= 60 ? 'C' : n >= 45 ? 'D' : 'F';
 
+// Ceiling applied when a blocker is present. Sits just below the D threshold so
+// a blocked page always reads as F, whatever else it gets right.
+const BLOCKED_CAP = 39;
+
 const earnedOf = (c) =>
   c.status === 'pass' ? c.weight : c.status === 'warn' ? c.weight * 0.5 : 0;
 
@@ -226,6 +371,19 @@ export function analyzeHtml(input) {
   const noindex = /\bnoindex\b/.test(robots);
   const nosnippet = /\bnosnippet\b/.test(robots) || /max-snippet:\s*0/.test(robots);
   const canonical = /<link[^>]+rel=["']canonical["']/i.test(html);
+
+  const robotsTxt = input.robotsTxt ? parseRobots(input.robotsTxt) : null;
+  let path = '/';
+  try {
+    path = new URL(finalUrl).pathname || '/';
+  } catch {
+    path = '/';
+  }
+  const googlebotAllowed = isAllowed(robotsTxt, 'Googlebot', path);
+  const blockedRetrieval = RETRIEVAL_BOTS.filter((b) => !isAllowed(robotsTxt, b, path));
+  const blockedTraining = TRAINING_BOTS.filter((b) => !isAllowed(robotsTxt, b, path));
+  const allRetrievalBlocked = blockedRetrieval.length === RETRIEVAL_BOTS.length;
+  const hasSitemap = (robotsTxt?.sitemaps.length ?? 0) > 0 || !!input.sitemapXml;
   add(
     'eligibility',
     'AI eligibility & crawlability',
@@ -256,6 +414,34 @@ export function analyzeHtml(input) {
         evidence: E.googleAi,
       },
       {
+        id: 'crawlable',
+        label: 'robots.txt allows Googlebot',
+        status: googlebotAllowed ? 'pass' : 'fail',
+        detail: googlebotAllowed
+          ? input.robotsTxt
+            ? `robots.txt does not disallow ${path} for Googlebot.`
+            : 'No robots.txt found, so nothing is disallowed.'
+          : `robots.txt disallows ${path} for Googlebot. Nothing else on this page can matter until that changes.`,
+        fix: 'Remove or narrow the Disallow rule in robots.txt that covers this path.',
+        why: 'A disallowed page is never fetched, so it cannot be indexed, ranked or quoted in AI Overviews.',
+        // Light on points deliberately: almost every site passes this, so heavy
+        // weight would just hand out free credit. Severity comes from the cap.
+        weight: 3,
+        evidence: E.googleAi,
+      },
+      {
+        id: 'aicrawlers',
+        label: 'AI answer engines can fetch the page',
+        status: blockedRetrieval.length === 0 ? 'pass' : 'fail',
+        detail: blockedRetrieval.length
+          ? `robots.txt blocks ${blockedRetrieval.join(', ')}. These fetch pages to answer questions and build search indexes, so blocking them removes this page from those answers.`
+          : 'The crawlers that AI answer engines use to retrieve and cite pages are all allowed.',
+        fix: `Allow the retrieval crawlers you want citations from (${RETRIEVAL_BOTS.join(', ')}). These are separate from the training crawlers, so you can allow citation without allowing training.`,
+        why: 'OpenAI documents that sites blocking OAI-SearchBot will not appear in ChatGPT search answers; Anthropic says the same of Claude-User and Claude-SearchBot.',
+        weight: 4,
+        evidence: E.openaiBots,
+      },
+      {
         id: 'https',
         label: 'Served over HTTPS',
         status: isHttps ? 'pass' : 'fail',
@@ -278,6 +464,34 @@ export function analyzeHtml(input) {
         why: 'Canonicals help Google pick one URL to index and cite instead of splitting authority.',
         weight: 4,
         evidence: E.googleStructured,
+      },
+      {
+        id: 'sitemap',
+        label: 'Sitemap is discoverable',
+        status: hasSitemap ? 'pass' : 'warn',
+        detail: hasSitemap
+          ? robotsTxt?.sitemaps.length
+            ? `robots.txt declares ${robotsTxt.sitemaps.length} sitemap(s).`
+            : 'A sitemap was found at /sitemap.xml.'
+          : 'No Sitemap: line in robots.txt and nothing at /sitemap.xml.',
+        fix: 'Publish a sitemap and point to it with a Sitemap: line in robots.txt.',
+        why: 'A sitemap lets crawlers enumerate every page instead of discovering them link by link.',
+        weight: 4,
+        evidence: E.googleAi,
+      },
+      {
+        id: 'aitraining',
+        label: 'AI training crawler posture',
+        status: 'info',
+        detail: !input.robotsTxt
+          ? 'No robots.txt, so training crawlers are unrestricted.'
+          : blockedTraining.length
+            ? `Blocked: ${blockedTraining.join(', ')}. Reported, not scored — whether to allow model training is a licensing decision, not a technical fault.`
+            : 'No training crawlers are blocked.',
+        fix: 'Nothing to fix. Decide deliberately, then state it in robots.txt either way.',
+        why: 'Note that Google-Extended only governs Gemini training and grounding. Blocking it does not remove a page from AI Overviews or AI Mode, which follow ordinary Googlebot and snippet rules.',
+        weight: 0,
+        evidence: E.googleExtended,
       },
     ],
   );
@@ -547,11 +761,43 @@ export function analyzeHtml(input) {
       inner.length > 0 || /aria-label=["'][^"']+["']|title=["'][^"']+["']/i.test(el);
     return !hasName;
   });
+  const signals = robotsTxt?.contentSignal;
+  const wellKnown = input.wellKnown ?? {};
+  const wellKnownFound = Object.entries(wellKnown)
+    .filter(([, found]) => found)
+    .map(([k]) => k);
   add(
     'agentic',
-    'Agentic web readiness',
-    'Standards for AI agents browsing your site are still emerging. Lighthouse reports these as pass/fail, not a weighted score, so we treat them the same way.',
+    'Agentic & AI-crawler readiness',
+    'Standards for AI agents browsing your site are still emerging. Where adoption is negligible we report rather than score, so a normal content site is never marked down for skipping something almost nobody has.',
     [
+      {
+        id: 'markdown',
+        label: 'Serves a markdown version',
+        status: input.markdown ? 'pass' : 'warn',
+        detail:
+          input.markdown === 'negotiated'
+            ? 'The page returns text/markdown when an agent sends Accept: text/markdown.'
+            : input.markdown === 'suffix'
+              ? 'A markdown version is available at the .md sibling URL.'
+              : 'No markdown version, so agents pay full HTML token cost to read this page.',
+        fix: 'Return text/markdown when the request carries Accept: text/markdown, and expose the same content at a .md URL as a fallback for agents that do not send the header.',
+        why: 'Cloudflare measured up to 80% fewer tokens serving markdown instead of HTML, which makes a page cheaper to read and likelier to be consumed whole. If your content is authored in markdown, as it is in Tina, this is a build-step change rather than a rewrite.',
+        weight: 4,
+        evidence: E.cloudflareAgent,
+      },
+      {
+        id: 'contentsignals',
+        label: 'Content Signals declared',
+        status: signals ? 'pass' : 'warn',
+        detail: signals
+          ? `robots.txt declares Content-Signal: ${signals}.`
+          : 'No Content-Signal directive, so there is no machine-readable statement of how this content may be used.',
+        fix: 'Add a Content-Signal line to robots.txt setting search, ai-input and ai-train to yes or no, matching whatever position you have actually taken.',
+        why: 'Content Signals separate appearing in search, being used to ground an AI answer, and being used for training. Cloudflare found only 4% of the top 200,000 domains have adopted it, so stating a position is still a differentiator.',
+        weight: 2,
+        evidence: E.contentSignals,
+      },
       {
         id: 'labels',
         label: 'Interactive elements are labelled',
@@ -570,12 +816,24 @@ export function analyzeHtml(input) {
         label: 'llms.txt file',
         status: 'info',
         detail: input.llmsTxt
-          ? 'An /llms.txt file was found.'
+          ? `An /llms.txt file was found${input.llmsFullTxt ? ', along with /llms-full.txt' : ''}.`
           : 'No /llms.txt file (this is fine).',
         fix: 'Optional. You can add one, but do not expect ranking gains from it.',
-        why: 'Informational only: Google has said it ignores llms.txt, and no major engine confirms using it. Lighthouse merely reports its presence.',
+        why: 'Informational only: Google has said it ignores llms.txt, and no major engine confirms using it. Lighthouse merely reports its presence. Markdown content negotiation is the check that carries weight here.',
         weight: 0,
         evidence: E.lighthouse,
+      },
+      {
+        id: 'agentprotocols',
+        label: 'Agent protocol discovery files',
+        status: 'info',
+        detail: wellKnownFound.length
+          ? `Found: ${wellKnownFound.join(', ')}.`
+          : 'None found, which is normal. Cloudflare counted fewer than 15 sites with these across the top 200,000 domains.',
+        fix: 'Nothing to do for a content site. Relevant once you expose an API or tools for agents to call.',
+        why: 'Reported for awareness only, and scored zero: an MCP server card or API catalogue says nothing about how well a marketing page answers a question.',
+        weight: 0,
+        evidence: E.cloudflareAgent,
       },
     ],
   );
@@ -584,9 +842,20 @@ export function analyzeHtml(input) {
   // 17 point at existing rules, and 5 (lang, entity, citations, statistics,
   // quotations) at rules created to back this tool. Verified against the
   // SSW.Rules.Content repo.
+  //
+  // Two slugs below are NOT yet written and need creating before launch:
+  // allow-ai-answer-engines (aicrawlers, contentsignals) and
+  // serve-markdown-to-ai-agents (markdown). Nothing existing covers them —
+  // make-your-website-llm-friendly is specifically about llms.txt, and
+  // use-robots-txt-effectively predates AI crawlers entirely.
   const SSW = {
     indexable: ['Do you make sure important pages are indexable?', 'page-indexed-by-google'],
     snippet: ['Do you allow search engines to show snippets?', 'page-indexed-by-google'],
+    crawlable: ['Do you use Robots.txt file effectively?', 'use-robots-txt-effectively'],
+    aicrawlers: ['Do you let AI answer engines crawl your site?', 'allow-ai-answer-engines'],
+    contentsignals: ['Do you state how AI may use your content?', 'allow-ai-answer-engines'],
+    markdown: ['Do you serve Markdown to AI agents?', 'serve-markdown-to-ai-agents'],
+    sitemap: ['Do you have a crawler-friendly sitemap.xml?', 'sitemap-xml-best-practices'],
     https: ['Do you use HTTPS everywhere?', 'do-you-provide-security-to-your-website-visitors'],
     canonical: ['Do you use canonical URLs?', 'seo-canonical-tags'],
     title: ['Do you have meaningful page titles?', 'make-title-h1-and-h2-tags-descriptive'],
@@ -604,7 +873,9 @@ export function analyzeHtml(input) {
     statistics: ['Do you back claims with statistics?', 'back-claims-with-data'],
     quotations: ['Do you include relevant quotations?', 'use-quotations'],
     scannable: ['Do you make content scannable?', 'web-users-dont-read'],
-    qa: ['Do you use question-based headings?', 'do-you-phrase-the-heading-as-a-question'],
+    // The old do-you-phrase-the-heading-as-a-question rule is archived, so this
+    // points at the live AEO/GEO rule, which covers answering questions directly.
+    qa: ['Do you optimize your content for AI answers?', 'ai-optimization-geo-aeo'],
     freshness: ['Do you show when content was last updated?', 'query-deserves-freshness'],
     depth: ['Do you write comprehensive content?', 'optimise-content-for-topical-authority'],
     labels: ['Do you make interactive elements accessible?', 'wcag-compliance'],
@@ -621,19 +892,48 @@ export function analyzeHtml(input) {
 
   const totalEarned = categories.reduce((a, c) => a + c.earned, 0);
   const totalPossible = categories.reduce((a, c) => a + c.possible, 0);
-  const overall = totalPossible ? Math.round((totalEarned / totalPossible) * 100) : 0;
+  const raw = totalPossible ? Math.round((totalEarned / totalPossible) * 100) : 0;
+
+  // Blockers are the conditions where a page cannot be fetched or indexed at
+  // all. Losing a few weighted points understates that, so they cap the score
+  // instead: a page no engine can reach must not grade well on presentation.
+  const blockers = [];
+  const eligibilityChecks = categories.find((c) => c.id === 'eligibility').checks;
+  const addBlocker = (checkId, reason) => {
+    blockers.push(reason);
+    // Flagged so it sorts above heavier checks in topFixes. These checks carry
+    // low weight on purpose, which would otherwise bury the one fix that counts.
+    const check = eligibilityChecks.find((c) => c.id === checkId);
+    if (check) {
+      check.blocker = true;
+    }
+  };
+  if (noindex) {
+    addBlocker('indexable', 'a noindex directive keeps this page out of Search and every AI feature');
+  }
+  if (!googlebotAllowed) {
+    addBlocker('crawlable', `robots.txt disallows ${path} for Googlebot, so it is never fetched`);
+  }
+  if (allRetrievalBlocked) {
+    addBlocker(
+      'aicrawlers',
+      'robots.txt blocks every AI retrieval crawler, so no answer engine can cite this page',
+    );
+  }
+  const overall = blockers.length ? Math.min(raw, BLOCKED_CAP) : raw;
 
   const allScored = categories.flatMap((c) => c.checks).filter((c) => c.status !== 'info');
   const passCount = allScored.filter((c) => c.status === 'pass').length;
 
   const topFixes = allScored
     .filter((c) => c.status !== 'pass')
-    .sort((a, b) => b.weight - a.weight)
+    .sort((a, b) => (b.blocker ? 1 : 0) - (a.blocker ? 1 : 0) || b.weight - a.weight)
     .slice(0, 3);
 
   const grade = GRADE(overall);
-  const headline =
-    overall >= 75
+  const headline = blockers.length
+    ? `Nothing else counts until this is fixed: ${blockers[0]}.`
+    : overall >= 75
       ? 'Strong footing for AI search. A few targeted fixes will push it further.'
       : overall >= 50
         ? 'A decent base with real gaps. The fixes below are where the wins are.'
@@ -644,6 +944,8 @@ export function analyzeHtml(input) {
     finalUrl,
     fetchedAt: input.fetchedAt,
     overall,
+    rawScore: raw,
+    blockers,
     grade,
     headline,
     categories,

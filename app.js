@@ -69,18 +69,52 @@ const buildMarkdown = (report) => {
   return out.join('\n');
 };
 
+// A prompt the visitor can paste straight into their coding agent. Built from
+// the same fix/why text the report already shows, so there is nothing to keep
+// in sync.
+const buildPrompt = (report, checks) =>
+  [
+    `I want to improve ${report.finalUrl} for search engines and AI answer engines.`,
+    'Please make the following changes to this codebase:',
+    '',
+    ...checks.map(
+      (c, i) =>
+        `${i + 1}. ${c.label}\n   Problem: ${c.detail}\n   Fix: ${c.fix}\n   Why: ${c.why}${
+          c.ssw ? `\n   Reference: ${c.ssw.url}` : ''
+        }`,
+    ),
+    '',
+    'Keep the existing behaviour and styling intact, and show me a diff for each file you change.',
+  ].join('\n');
+
+const COPY_ICON =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+
 const reportHeader = (report) => `
   <section class="report-head reveal">
     <div class="report-head-text">
       <h2>Your full report</h2>
       <p>All ${report.totalScored} checks, with the exact fix and the evidence behind each.</p>
     </div>
-    <button class="btn btn-ghost" type="button" id="copy-md">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-        Copy as Markdown
-      </button>
+    <div class="report-head-actions">
+      ${
+        report.passCount < report.totalScored
+          ? `<button class="btn btn-ghost" type="button" id="copy-prompt-all" data-label="Copy all fixes as a prompt">${COPY_ICON}Copy all fixes as a prompt</button>`
+          : ''
+      }
+      <button class="btn btn-ghost" type="button" id="copy-md" data-label="Copy as Markdown">${COPY_ICON}Copy as Markdown</button>
+    </div>
     <pre id="md-pre" hidden></pre>
   </section>`;
+
+const blockerBanner = (report) =>
+  report.blockers?.length
+    ? `<div class="blockers reveal">
+    <h3>This page is blocked from AI answers</h3>
+    <p>Everything below still applies, but none of it can help until this is fixed. On presentation alone this page scored ${report.rawScore}.</p>
+    <ul>${report.blockers.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>
+  </div>`
+    : '';
 
 const checkRow = (check) => `
   <div class="check" id="check-${check.id}">
@@ -102,6 +136,11 @@ const checkRow = (check) => `
           <span class="lr-left">${evidenceBadge(check.evidence)}</span>
           ${check.ssw ? sswLink(check.ssw) : ''}
         </div>
+        ${
+          check.status === 'pass' || check.status === 'info'
+            ? ''
+            : `<button class="btn-prompt" type="button" data-prompt-check="${esc(check.id)}" data-label="Copy prompt for your coding agent">${COPY_ICON}Copy prompt for your coding agent</button>`
+        }
       </div>
     </div>
   </div>`;
@@ -250,7 +289,7 @@ const CAT_TITLES = [
   'Search fundamentals',
   'Structured data & entities',
   'Answer-engine content signals',
-  'Agentic web readiness',
+  'Agentic & AI-crawler readiness',
 ];
 
 // --- editorial score view: typographic, no shader --------------------------
@@ -354,31 +393,52 @@ const wireAccordion = () => {
   });
 };
 
-const wireCopy = (report) => {
-  const btn = $('#copy-md');
+// Every copy button shares this: try the clipboard, and if it is unavailable
+// fall back to selecting the text in the hidden <pre> so Cmd/Ctrl+C works.
+const copyOut = async (btn, text) => {
   const pre = $('#md-pre');
-  if (!btn || !pre) {
-    return;
-  }
-  const md = buildMarkdown(report);
-  pre.textContent = md;
-  btn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(md);
-      btn.textContent = 'Copied ✓';
-    } catch {
-      btn.textContent = 'Press Cmd/Ctrl+C';
+  const label = btn.dataset.label;
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied ✓';
+  } catch {
+    btn.textContent = 'Press Cmd/Ctrl+C';
+    if (pre) {
+      pre.textContent = text;
       const range = document.createRange();
       range.selectNodeContents(pre);
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    setTimeout(() => {
-      btn.textContent = 'Copy as Markdown';
-    }, 2200);
-  });
+  }
+  setTimeout(() => {
+    btn.innerHTML = `${COPY_ICON}${label}`;
+  }, 2200);
 };
+
+// Registered once, and reads lastReport rather than closing over a report, so
+// analyzing a second URL cannot leave a stale handler behind.
+results.addEventListener('click', (e) => {
+  const btn = e.target.closest('#copy-md, #copy-prompt-all, [data-prompt-check]');
+  if (!btn || !lastReport) {
+    return;
+  }
+  if (btn.id === 'copy-md') {
+    copyOut(btn, buildMarkdown(lastReport));
+    return;
+  }
+  const failing = lastReport.categories
+    .flatMap((c) => c.checks)
+    .filter((c) => c.status === 'warn' || c.status === 'fail');
+  const checks =
+    btn.id === 'copy-prompt-all'
+      ? failing
+      : failing.filter((c) => c.id === btn.dataset.promptCheck);
+  if (checks.length) {
+    copyOut(btn, buildPrompt(lastReport, checks));
+  }
+});
 
 const renderResults = (report) => {
   lastReport = report;
@@ -387,14 +447,13 @@ const renderResults = (report) => {
     .getElementById('editorial')
     .insertAdjacentHTML(
       'afterend',
-      `<div class="post-tease" id="post-tease">${topFixes(report)}<div id="gate-slot">${autoFull ? fullReport(report) : leadGate(report)}</div></div>`,
+      `<div class="post-tease" id="post-tease">${blockerBanner(report)}${topFixes(report)}<div id="gate-slot">${autoFull ? fullReport(report) : leadGate(report)}</div></div>`,
     );
   revealAll();
   armScrollHint();
   if (autoFull) {
     // Arrived via the email deep-link — skip the gate, show the full report.
     wireAccordion();
-    wireCopy(report);
   } else {
     wireLeadForm(report);
   }
@@ -449,7 +508,6 @@ const wireLeadForm = (report) => {
     }
     $('#gate-slot').innerHTML = fullReport(report);
     wireAccordion();
-    wireCopy(report);
     revealAll();
   });
 };

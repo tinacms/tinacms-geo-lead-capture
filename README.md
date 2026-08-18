@@ -51,6 +51,49 @@ gate still unlocks, it just doesn't store the lead):
 
 Every check links its source and is tagged Official docs / Study / Vendor view /
 Experimental. Key sources: the GEO paper (arXiv 2311.09735), Google Search
-Central's AI-features guidance, and Chrome Lighthouse's agentic-browsing scoring.
+Central's AI-features guidance, OpenAI's and Anthropic's crawler docs, Cloudflare's
+Agent Readiness score, and Chrome Lighthouse's agentic-browsing scoring.
 `llms.txt` is reported but scored as informational only (Google has said it
 ignores it).
+
+## Scoring
+
+31 checks — 28 scored over 114 weighted points, plus 3 informational. `pass` earns
+full weight, `warn` half, `fail` nothing; `info` checks are excluded from the
+denominator entirely.
+
+Three conditions are **blockers**: `noindex`, a robots.txt `Disallow` on the
+analysed path for Googlebot, and every AI retrieval crawler being blocked. Any
+one of them caps the score at 39 (an F) and replaces the headline, because a page
+no engine can reach should not grade well on presentation. The uncapped number is
+kept as `rawScore`.
+
+Deliberate asymmetries, so the score stays defensible:
+
+- **Retrieval crawlers are scored, training crawlers are not.** Blocking
+  `OAI-SearchBot` or `Claude-SearchBot` costs citations, so it fails. Blocking
+  `GPTBot` or `Google-Extended` is a licensing decision and is reported as info at
+  weight 0. Note `Google-Extended` governs only Gemini training and grounding —
+  blocking it does not remove a page from AI Overviews or AI Mode.
+- **Emerging protocol files score zero.** `llms.txt`, MCP server cards, Agent
+  Skills indexes and API catalogues are reported for awareness. Markdown content
+  negotiation is the only emerging signal carrying weight, because it has a
+  measured benefit (Cloudflare: up to 80% fewer tokens than HTML).
+- **Pass-by-default checks stay light.** `crawlable` is only 3 points: nearly
+  every site passes it, so heavy weight would just inflate every score. Its
+  severity comes from the blocker cap instead.
+
+## SSW rules
+
+Every check links to a rule under ssw.com.au/rules/. Two were written to back
+the new checks and are now live, under a new "Rules to Better AEO and GEO"
+category:
+
+- [allow-ai-answer-engines](https://www.ssw.com.au/rules/allow-ai-answer-engines/) — AI crawler access and Content Signals (SSW.Rules.Content#13167)
+- [serve-markdown-to-ai-agents](https://www.ssw.com.au/rules/serve-markdown-to-ai-agents/) — markdown content negotiation (SSW.Rules.Content#13168)
+- [The category](https://www.ssw.com.au/rules/rules-to-better-aeo-and-geo/) (SSW.Rules.Content#13169)
+
+Every slug in the `SSW` map was audited against SSW.Rules.Content and resolves to
+a live, non-archived rule. The `qa` check used to point at
+`do-you-phrase-the-heading-as-a-question`, which is archived, so it now points at
+`ai-optimization-geo-aeo`.

@@ -3,7 +3,7 @@
   "cleanUrls": true,
   "functions": {
     "api/*.mjs": {
-      "maxDuration": 15
+      "maxDuration": 30
     }
   },
   "crons": [
