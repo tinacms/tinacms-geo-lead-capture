@@ -4,6 +4,8 @@ import { isIP } from 'node:net';
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_BYTES = 3_000_000;
 const MAX_REDIRECTS = 4;
+const PROBE_TIMEOUT_MS = 3_000;
+const PROBE_MAX_BYTES = 200_000;
 const UA = 'TinaAiReadinessBot/1.0 (+https://tina.io/ai-search-readiness)';
 
 // Reject loopback, private, link-local (incl. cloud metadata 169.254.169.254)
@@ -95,7 +97,7 @@ export const safeFetch = async (start) => {
   throw new Error('TOO_MANY_REDIRECTS');
 };
 
-export const readCapped = async (res) => {
+export const readCapped = async (res, cap = MAX_BYTES) => {
   const reader = res.body?.getReader();
   if (!reader) {
     return await res.text();
@@ -109,7 +111,7 @@ export const readCapped = async (res) => {
     }
     total += value.length;
     chunks.push(value);
-    if (total > MAX_BYTES) {
+    if (total > cap) {
       await reader.cancel();
       break;
     }
@@ -117,21 +119,80 @@ export const readCapped = async (res) => {
   return Buffer.concat(chunks).toString('utf-8');
 };
 
-// llms.txt is a same-origin GET, validated by construction from finalUrl.
-export const checkLlmsTxt = async (finalUrl) => {
+// Same-origin GET of a well-known path. The origin comes from an already
+// validated finalUrl, so there is nothing new to check. Returns null for
+// anything that is not a usable 2xx body, because every caller treats a failed
+// probe and a missing file the same way.
+export const probeOrigin = async (finalUrl, path, accept = '*/*') => {
   try {
     const origin = new URL(finalUrl).origin;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const lr = await fetch(`${origin}/llms.txt`, {
-      signal: controller.signal,
-      headers: { 'User-Agent': UA },
-    });
-    clearTimeout(timer);
-    return (
-      lr.ok && /text\/(plain|markdown)/i.test(lr.headers.get('content-type') ?? 'text/plain')
-    );
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${origin}${path}`, {
+        signal: controller.signal,
+        headers: { 'User-Agent': UA, Accept: accept },
+      });
+      if (!res.ok) {
+        return null;
+      }
+      return {
+        contentType: res.headers.get('content-type') ?? '',
+        text: await readCapped(res, PROBE_MAX_BYTES),
+      };
+    } finally {
+      clearTimeout(timer);
+    }
   } catch {
-    return false;
+    return null;
   }
+};
+
+// The .md sibling convention. "/" has no stem to suffix, so it maps to
+// /index.md rather than producing "https://example.com.md".
+const mdVariantUrl = (finalUrl) => {
+  const u = new URL(finalUrl);
+  u.search = '';
+  u.hash = '';
+  const stem = u.pathname.replace(/\/+$/, '');
+  u.pathname = stem ? `${stem}.md` : '/index.md';
+  return u.toString();
+};
+
+// Does this origin serve a token-cheap markdown variant? Two shots: the
+// Accept header, then the .md sibling. Redirects are not followed — finalUrl
+// was validated hop by hop, a fresh redirect target would not be.
+export const negotiateMarkdown = async (finalUrl) => {
+  const isMarkdown = (ct) => /text\/(markdown|x-markdown)/i.test(ct);
+  const get = async (target) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+      return await fetch(target, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: { 'User-Agent': UA, Accept: 'text/markdown' },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  try {
+    const negotiated = await get(finalUrl);
+    if (negotiated.ok && isMarkdown(negotiated.headers.get('content-type') ?? '')) {
+      return 'negotiated';
+    }
+  } catch {
+    // fall through to the .md sibling
+  }
+  try {
+    const sibling = await get(mdVariantUrl(finalUrl));
+    if (sibling.ok && isMarkdown(sibling.headers.get('content-type') ?? '')) {
+      return 'suffix';
+    }
+  } catch {
+    // no markdown variant
+  }
+  return null;
 };

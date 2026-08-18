@@ -481,6 +481,73 @@ input:focus {
   border-color: var(--orange);
 }
 
+.report-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Blocker banner: shown above the top fixes when the page cannot be reached or
+   indexed at all, so the capped score explains itself. */
+.blockers {
+  border: 1px solid #fecaca;
+  border-left: 4px solid #dc2626;
+  background: #fef2f2;
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+}
+
+.blockers h3 {
+  font-family: var(--font-head);
+  font-size: 1.125rem;
+  color: #991b1b;
+}
+
+.blockers p {
+  color: var(--text-2);
+  font-size: 0.875rem;
+  margin-top: 0.3rem;
+}
+
+.blockers ul {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+  color: #7f1d1d;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* "Copy prompt for your coding agent" inside a check's fix panel */
+.btn-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding: 0.45rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-prompt:hover {
+  color: var(--orange-600);
+  border-color: var(--border-strong);
+}
+
+.btn-prompt svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* Top fixes -> full report / gate: keep a clear gap between the two sections */
 .post-tease {
   display: flex;

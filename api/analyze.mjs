@@ -1,10 +1,23 @@
 import { analyzeHtml } from './_lib/engine.mjs';
 import {
-  checkLlmsTxt,
+  negotiateMarkdown,
   normalizeUrl,
+  probeOrigin,
   readCapped,
   safeFetch,
 } from './_lib/fetchSafe.mjs';
+
+// Emerging agent-protocol files. Presence is reported, never scored, so a plain
+// HEAD-shaped probe for existence is all we need.
+const WELL_KNOWN = {
+  'MCP server card': '/.well-known/mcp/server-card.json',
+  'Agent Skills index': '/.well-known/agent-skills/index.json',
+  'API catalogue': '/.well-known/api-catalog',
+};
+
+// Plenty of sites answer any unknown path with a 200 HTML page, so a probe that
+// came back as HTML means the file does not exist.
+const isSoft404 = (probe) => !probe || /html/i.test(probe.contentType);
 
 const json = (res, status, body) => {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -48,14 +61,35 @@ export default async function handler(req, res) {
     pageRes.headers.forEach((v, k) => {
       headers[k] = v;
     });
-    const llmsTxt = await checkLlmsTxt(finalUrl);
+    // Every origin probe is independent, so they all go out at once: one extra
+    // round trip on top of the page fetch rather than eight.
+    const wellKnownPaths = Object.entries(WELL_KNOWN);
+    const [robotsTxt, sitemapXml, llmsTxt, llmsFullTxt, markdown, ...wellKnownRes] =
+      await Promise.all([
+        probeOrigin(finalUrl, '/robots.txt'),
+        probeOrigin(finalUrl, '/sitemap.xml'),
+        probeOrigin(finalUrl, '/llms.txt'),
+        probeOrigin(finalUrl, '/llms-full.txt'),
+        negotiateMarkdown(finalUrl),
+        ...wellKnownPaths.map(([, p]) => probeOrigin(finalUrl, p)),
+      ]);
+
+    const wellKnown = {};
+    wellKnownPaths.forEach(([label], i) => {
+      wellKnown[label] = !!wellKnownRes[i];
+    });
 
     const report = analyzeHtml({
       url: target.toString(),
       finalUrl,
       headers,
       html,
-      llmsTxt,
+      robotsTxt: isSoft404(robotsTxt) ? null : robotsTxt.text,
+      sitemapXml: !isSoft404(sitemapXml) && /<(urlset|sitemapindex)\b/i.test(sitemapXml.text),
+      llmsTxt: !isSoft404(llmsTxt),
+      llmsFullTxt: !isSoft404(llmsFullTxt),
+      markdown,
+      wellKnown,
       fetchedAt: new Date().toISOString(),
     });
     return json(res, 200, report);

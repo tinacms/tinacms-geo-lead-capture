@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { analyzeHtml } from './engine.mjs';
+import { analyzeHtml, isAllowed, parseRobots } from './engine.mjs';
+
+const checkOf = (report, category, id) =>
+  report.categories.find((c) => c.id === category).checks.find((c) => c.id === id);
 
 const base = (html, extra = {}) => ({
   url: 'https://example.com',
@@ -66,6 +69,127 @@ test('reports up to three highest-weight non-passing fixes', () => {
   const r = analyzeHtml(base(html, { finalUrl: 'http://example.com' }));
   assert.ok(r.topFixes.length <= 3);
   assert.ok(r.topFixes.every((c) => c.status !== 'pass'));
+});
+
+test('parseRobots groups rules by user-agent and reads non-group directives', () => {
+  const r = parseRobots(`
+    # comment
+    User-agent: *
+    User-agent: Bingbot
+    Disallow: /private
+    Allow: /private/public
+
+    User-agent: GPTBot
+    Disallow: /
+
+    Sitemap: https://example.com/sitemap.xml
+    Content-Signal: ai-train=no, search=yes
+  `);
+  assert.equal(r.groups.length, 2);
+  assert.deepEqual(r.groups[0].agents, ['*', 'bingbot']);
+  assert.deepEqual(r.sitemaps, ['https://example.com/sitemap.xml']);
+  assert.equal(r.contentSignal, 'ai-train=no, search=yes');
+});
+
+test('isAllowed applies longest-match precedence with Allow winning ties', () => {
+  const robots = parseRobots(
+    'User-agent: *\nDisallow: /private\nAllow: /private/public\nDisallow: /x\nAllow: /x\n',
+  );
+  assert.equal(isAllowed(robots, 'Googlebot', '/private/thing'), false);
+  assert.equal(isAllowed(robots, 'Googlebot', '/private/public/thing'), true);
+  assert.equal(isAllowed(robots, 'Googlebot', '/elsewhere'), true);
+  // Equal-length Allow and Disallow: Allow wins.
+  assert.equal(isAllowed(robots, 'Googlebot', '/x'), true);
+});
+
+test('isAllowed honours wildcards, end anchors and per-agent groups', () => {
+  const robots = parseRobots(
+    'User-agent: *\nDisallow: /*.pdf$\n\nUser-agent: GPTBot\nDisallow: /\n',
+  );
+  assert.equal(isAllowed(robots, 'Googlebot', '/docs/a.pdf'), false);
+  assert.equal(isAllowed(robots, 'Googlebot', '/docs/a.pdf?v=1'), true, '$ anchors the match');
+  assert.equal(isAllowed(robots, 'Googlebot', '/docs/a.html'), true);
+  // A specific group replaces the * group rather than adding to it.
+  assert.equal(isAllowed(robots, 'GPTBot', '/anything'), false);
+  assert.equal(isAllowed(robots, 'gptbot', '/anything'), false, 'agent match is case-insensitive');
+  // No robots.txt at all means nothing is disallowed.
+  assert.equal(isAllowed(null, 'Googlebot', '/anything'), true);
+});
+
+test('blocks on a robots.txt Disallow and caps the score regardless of page quality', () => {
+  const html = `<!doctype html><html lang="en"><head><title>A perfectly good page title</title>
+    <meta name="description" content="Good."><meta name="viewport" content="width=device-width">
+    <link rel="canonical" href="https://example.com/"></head><body><h1>Good</h1><h2>Also good?</h2>
+    <blockquote>q</blockquote><ul><li>a</li></ul><table><tr><td>1</td></tr></table></body></html>`;
+  const open = analyzeHtml(base(html));
+  const blocked = analyzeHtml(base(html, { robotsTxt: 'User-agent: *\nDisallow: /\n' }));
+
+  assert.ok(blocked.blockers.length > 0);
+  assert.ok(blocked.overall < 45, `expected a capped F, got ${blocked.overall}`);
+  assert.equal(blocked.grade, 'F');
+  assert.ok(blocked.rawScore > blocked.overall, 'raw score is kept for reference');
+  assert.match(blocked.headline, /Nothing else counts/);
+  assert.equal(checkOf(blocked, 'eligibility', 'crawlable').status, 'fail');
+  // Blockers are deliberately low-weight, so without the blocker flag heavier
+  // content checks would push the fixes that matter out of the top three.
+  assert.equal(blocked.topFixes[0].blocker, true);
+  assert.ok(blocked.topFixes.some((f) => f.id === 'crawlable'));
+  // Same HTML, no robots.txt: not blocked, and scores on its merits.
+  assert.equal(open.blockers.length, 0);
+  assert.equal(checkOf(open, 'eligibility', 'crawlable').status, 'pass');
+});
+
+test('scores retrieval crawlers but only reports training crawlers', () => {
+  const html = '<html><head><title>A reasonable page title here</title></head><body>hi</body></html>';
+  const trainingBlocked = analyzeHtml(
+    base(html, { robotsTxt: 'User-agent: GPTBot\nDisallow: /\n' }),
+  );
+  const retrievalBlocked = analyzeHtml(
+    base(html, { robotsTxt: 'User-agent: OAI-SearchBot\nDisallow: /\n' }),
+  );
+
+  // Blocking training is a licensing choice: reported, never scored, never a blocker.
+  assert.equal(checkOf(trainingBlocked, 'eligibility', 'aicrawlers').status, 'pass');
+  assert.equal(checkOf(trainingBlocked, 'eligibility', 'aitraining').status, 'info');
+  assert.match(checkOf(trainingBlocked, 'eligibility', 'aitraining').detail, /GPTBot/);
+  assert.equal(trainingBlocked.blockers.length, 0);
+
+  // Blocking one retrieval bot costs points but is not fatal on its own.
+  assert.equal(checkOf(retrievalBlocked, 'eligibility', 'aicrawlers').status, 'fail');
+  assert.equal(retrievalBlocked.blockers.length, 0);
+  assert.ok(retrievalBlocked.overall < trainingBlocked.overall);
+});
+
+test('treats a blanket AI block as a blocker', () => {
+  const html = '<html><head><title>A reasonable page title here</title></head><body>hi</body></html>';
+  const r = analyzeHtml(
+    base(html, {
+      robotsTxt: [
+        'User-agent: OAI-SearchBot',
+        'User-agent: Claude-User',
+        'User-agent: Claude-SearchBot',
+        'User-agent: PerplexityBot',
+        'User-agent: Bingbot',
+        'Disallow: /',
+      ].join('\n'),
+    }),
+  );
+  assert.ok(r.blockers.some((b) => /every AI retrieval crawler/.test(b)));
+  assert.equal(r.grade, 'F');
+});
+
+test('markdown negotiation is scored, agent protocol files are not', () => {
+  const html = '<html><head><title>A reasonable page title here</title></head><body>hi</body></html>';
+  const plain = analyzeHtml(base(html));
+  const md = analyzeHtml(base(html, { markdown: 'negotiated' }));
+  const withMcp = analyzeHtml(base(html, { wellKnown: { 'MCP server card': true } }));
+
+  assert.equal(checkOf(plain, 'agentic', 'markdown').status, 'warn');
+  assert.equal(checkOf(md, 'agentic', 'markdown').status, 'pass');
+  assert.ok(md.overall > plain.overall, 'markdown support earns points');
+  // Emerging protocol files are reported for awareness and must not move the score.
+  assert.equal(withMcp.overall, plain.overall);
+  assert.equal(checkOf(withMcp, 'agentic', 'agentprotocols').status, 'info');
 });
 
 test('strips HTML tags out of extracted title text (defense in depth)', () => {
