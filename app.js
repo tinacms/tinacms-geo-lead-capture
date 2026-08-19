@@ -9,6 +9,18 @@ const esc = (s) =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
 
+// Error rows keep their slot in the layout at all times (see .error in the CSS),
+// so showing one never pushes the form around.
+const showError = (el, message) => {
+  el.innerHTML = `<span class="err-x" aria-hidden="true">❌</span><span>${esc(message)}</span>`;
+  el.classList.add('is-shown');
+};
+
+const clearError = (el) => {
+  el.textContent = '';
+  el.classList.remove('is-shown');
+};
+
 const ICONS = {
   pass: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
   warn: '<path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>',
@@ -40,6 +52,11 @@ const sourceLink = (ev) =>
   `<a class="read-more" href="${esc(ev.url)}" target="_blank" rel="noopener noreferrer">${READ_LABEL[ev.type]} at ${esc(ev.source)}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
 
 const evidenceRow = (ev) => `<div class="ev-row">${evidenceBadge(ev)}</div>`;
+
+// Top-fix link target: the SSW rule, which carries the full explanation and
+// links on to the primary source (Google, the GEO study) itself.
+const ruleLink = (ssw) =>
+  `<a class="read-more" href="${esc(ssw.url)}" target="_blank" rel="noopener noreferrer">Read the SSW rule: ${esc(ssw.title)}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
 
 const sswLink = (ssw) =>
   `<a class="ssw-link" href="${esc(ssw.url)}" target="_blank" rel="noopener noreferrer" title="SSW Rule: ${esc(ssw.title)}">Read the SSW rule<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>`;
@@ -99,10 +116,10 @@ const reportHeader = (report) => `
     <div class="report-head-actions">
       ${
         report.passCount < report.totalScored
-          ? `<button class="btn btn-ghost" type="button" id="copy-prompt-all" data-label="Copy all fixes as a prompt">${COPY_ICON}Copy all fixes as a prompt</button>`
+          ? `<button class="btn btn-ghost" type="button" id="copy-prompt-all" data-label="Copy all fixes as a prompt">${COPY_ICON}<span class="btn-label">Copy all fixes as a prompt</span></button>`
           : ''
       }
-      <button class="btn btn-ghost" type="button" id="copy-md" data-label="Copy as Markdown">${COPY_ICON}Copy as Markdown</button>
+      <button class="btn btn-ghost" type="button" id="copy-md" data-label="Copy as Markdown">${COPY_ICON}<span class="btn-label">Copy as Markdown</span></button>
     </div>
     <pre id="md-pre" hidden></pre>
   </section>`;
@@ -139,7 +156,7 @@ const checkRow = (check) => `
         ${
           check.status === 'pass' || check.status === 'info'
             ? ''
-            : `<button class="btn-prompt" type="button" data-prompt-check="${esc(check.id)}" data-label="Copy prompt for your coding agent">${COPY_ICON}Copy prompt for your coding agent</button>`
+            : `<button class="btn-prompt" type="button" data-prompt-check="${esc(check.id)}" data-label="Copy prompt for your coding agent">${COPY_ICON}<span class="btn-label">Copy prompt for your coding agent</span></button>`
         }
       </div>
     </div>
@@ -209,7 +226,11 @@ const topFixes = (report) => {
         .map(
           (f, i) => `<li class="fix-item">
         <span class="fix-num">${i + 1}</span>
-        <span><span class="lbl">${esc(f.label)}</span><span class="why">${esc(f.why)}</span>${sourceLink(f.evidence)}</span>
+        <span><span class="lbl">${esc(f.label)}</span><span class="why">${esc(f.why)}</span>${
+          // Prefer the SSW rule: it explains the fix in full and cites the
+          // primary source itself, so we do not send people straight to Google.
+          f.ssw ? ruleLink(f.ssw) : sourceLink(f.evidence)
+        }</span>
       </li>`,
         )
         .join('')}
@@ -217,19 +238,30 @@ const topFixes = (report) => {
   </div>`;
 };
 
+// The analyzed domain, for headings that name what the report is about.
+const reportHost = (report) => {
+  try {
+    return new URL(report.finalUrl).hostname.replace(/^www\./, '');
+  } catch {
+    return 'your site';
+  }
+};
+
 const leadGate = (report) => `
   <div class="gate reveal" id="gate">
     <div class="peek" aria-hidden="true"><span style="width:66%"></span><span style="width:50%"></span><span style="width:75%"></span><span style="width:40%"></span></div>
     <div class="inner">
-      <span class="lock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-      <h3>See your full report</h3>
+      <h3 class="gate-title">
+        <span class="lock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        See full report for ${esc(reportHost(report))}
+      </h3>
       <p>Unlock all ${report.totalScored} checks with the exact fix and the evidence behind each one, plus where to go next. We&rsquo;ll email you a copy.</p>
       <form id="lead-form">
         <input type="email" id="lead-email" placeholder="you@company.com" aria-label="Your email" />
-        <input type="tel" id="lead-phone" placeholder="Phone number" aria-label="Your phone number" autocomplete="tel" />
-        <button class="btn" type="submit" id="lead-btn">Send report</button>
+        <input type="tel" id="lead-phone" placeholder="+1 555 555 555" aria-label="Your phone number" autocomplete="tel" />
+        <button class="btn cta-btn" type="submit" id="lead-btn">Email me the full report</button>
       </form>
-      <p class="error hidden" id="lead-error"></p>
+      <p class="error" id="lead-error" role="alert" aria-live="polite"></p>
       <p class="microcopy">No spam. Unsubscribe anytime.</p>
     </div>
   </div>`;
@@ -351,8 +383,13 @@ const countUp = (el, to, ms, colorize) => {
 const editorialShell = () => `
   <div class="editorial loading" id="editorial">
     <div class="ed-main">
+      <span class="ed-brand">
+        <img src="/geo/tina-logo.svg" alt="TinaCMS" height="20" />
+        <span>AI Search Readiness</span>
+      </span>
       <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
       <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
+      <span class="ed-scored" id="ed-scored"></span>
     </div>
     <ul class="ed-stats" id="ed-stats">${edStatsPlaceholder()}</ul>
   </div>`;
@@ -368,6 +405,7 @@ const startEditorial = () => {
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
   $('#ed-stats').innerHTML = edStats(report);
+  $('#ed-scored').textContent = `${reportHost(report)} · ${report.passCount}/${report.totalScored} checks passed`;
   countUp($('#ed-num'), report.overall, 900, true);
   const bar = $('#ed-bar-fill');
   bar.style.setProperty('--w', `${report.overall}%`);
@@ -398,11 +436,18 @@ const wireAccordion = () => {
 const copyOut = async (btn, text) => {
   const pre = $('#md-pre');
   const label = btn.dataset.label;
+  // Pin the current width before the label changes, so "Copied ✓" cannot
+  // resize the button and shove the rest of the row around.
+  btn.style.width = `${btn.getBoundingClientRect().width}px`;
+  const setLabel = (t) => {
+    btn.innerHTML = `${COPY_ICON}<span class="btn-label">${t}</span>`;
+  };
+
   try {
     await navigator.clipboard.writeText(text);
-    btn.textContent = 'Copied ✓';
+    setLabel('Copied ✓');
   } catch {
-    btn.textContent = 'Press Cmd/Ctrl+C';
+    setLabel('Press Cmd/Ctrl+C');
     if (pre) {
       pre.textContent = text;
       const range = document.createRange();
@@ -413,7 +458,8 @@ const copyOut = async (btn, text) => {
     }
   }
   setTimeout(() => {
-    btn.innerHTML = `${COPY_ICON}${label}`;
+    setLabel(label);
+    btn.style.width = '';
   }, 2200);
 };
 
@@ -470,16 +516,14 @@ const wireLeadForm = (report) => {
     const phone = $('#lead-phone').value.trim();
     const errEl = $('#lead-error');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errEl.textContent = 'Enter a valid email address.';
-      errEl.classList.remove('hidden');
+      showError(errEl, 'That email doesn’t look right. Check for a typo and try again.');
       return;
     }
     if ((phone.match(/\d/g) || []).length < 6) {
-      errEl.textContent = 'Enter a valid phone number.';
-      errEl.classList.remove('hidden');
+      showError(errEl, 'That phone number looks too short. Include your area code.');
       return;
     }
-    errEl.classList.add('hidden');
+    clearError(errEl);
     const btn = $('#lead-btn');
     btn.disabled = true;
     btn.textContent = 'Sending…';
@@ -518,11 +562,10 @@ $('#analyze-form').addEventListener('submit', async (e) => {
   const errEl = $('#form-error');
   const btn = $('#analyze-btn');
   if (!url) {
-    errEl.textContent = 'Enter a URL to analyze.';
-    errEl.classList.remove('hidden');
+    showError(errEl, 'Enter a page URL to analyze, for example yourdomain.com/about.');
     return;
   }
-  errEl.classList.add('hidden');
+  clearError(errEl);
   results.innerHTML = editorialShell();
   results.classList.remove('hidden');
   startEditorial();
@@ -531,8 +574,7 @@ $('#analyze-form').addEventListener('submit', async (e) => {
   const fail = (msg) => {
     results.innerHTML = '';
     results.classList.add('hidden');
-    errEl.textContent = msg;
-    errEl.classList.remove('hidden');
+    showError(errEl, msg);
   };
   try {
     const res = await fetch('/geo/api/analyze', {
@@ -542,7 +584,7 @@ $('#analyze-form').addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (!res.ok) {
-      fail(data.error || 'Something went wrong. Try another URL.');
+      fail(data.error || 'We couldn’t analyze that page. Try another URL.');
       return;
     }
     await minLoad;
@@ -551,7 +593,7 @@ $('#analyze-form').addEventListener('submit', async (e) => {
       results.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     );
   } catch {
-    fail('Network error. Please try again.');
+    fail('We couldn’t reach the internet just then. Check your connection and try again.');
   } finally {
     btn.disabled = false;
   }
