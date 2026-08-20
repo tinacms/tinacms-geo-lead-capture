@@ -45,6 +45,11 @@ export const signReport = (r) => {
 };
 
 export const verifyReport = (r, sig) => {
+  // A missing report is now a rejection, so this is a real code path, not a
+  // defensive one.
+  if (!r || typeof r !== 'object') {
+    return false;
+  }
   const expected = signReport(r);
   // No key means nothing can be trusted, so nothing verifies. The length check
   // is what makes timingSafeEqual safe to call — it throws on a mismatch.

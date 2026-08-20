@@ -120,6 +120,26 @@ export const emailText = (r) => {
   );
 };
 
+// Cloudflare Turnstile. Fails closed: no secret configured means no lead is
+// accepted, rather than a bot check that silently does nothing.
+async function verifyTurnstile(token, ip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret || !token) {
+    return false;
+  }
+  try {
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret, response: token, ...(ip ? { remoteip: ip } : {}) }),
+    });
+    const data = await r.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
 async function addToMailchimp(email, note) {
   const apiKey = process.env.MAILCHIMP_API_KEY;
   const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
@@ -235,6 +255,7 @@ export default async function handler(req, res) {
   let note = '';
   let report = null;
   let sig = '';
+  let turnstileToken = '';
   let phone = '';
   let website = '';
   try {
@@ -244,6 +265,7 @@ export default async function handler(req, res) {
     note = typeof body.note === 'string' ? body.note.slice(0, 500) : '';
     report = body.report && typeof body.report === 'object' ? body.report : null;
     sig = typeof body.sig === 'string' ? body.sig : '';
+    turnstileToken = typeof body.turnstileToken === 'string' ? body.turnstileToken : '';
     phone = typeof body.phone === 'string' ? body.phone.slice(0, 40) : '';
     website = typeof body.website === 'string' ? body.website.slice(0, 300) : '';
   } catch {
@@ -252,11 +274,16 @@ export default async function handler(req, res) {
   if (!isEmail(email)) {
     return json(res, 400, { error: 'Enter a valid email address.' });
   }
-  // We only email reports we generated. Anything else is someone using our
-  // sender to deliver their own text, so refuse the whole request rather than
-  // quietly dropping the report and still touching the CRM.
-  if (report && !verifyReport(report, sig)) {
+  // A signed report is mandatory, not optional. The gate only ever appears
+  // after an analysis, so a lead without one did not come from the form —
+  // and without this, omitting the report skipped the check entirely and still
+  // wrote to Mailchimp and HubSpot.
+  if (!verifyReport(report, sig)) {
     return json(res, 400, { error: 'Invalid request.' });
+  }
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  if (!(await verifyTurnstile(turnstileToken, ip))) {
+    return json(res, 400, { error: 'We couldn’t verify that request. Please try again.' });
   }
 
   // All best-effort — never hold the user's report hostage to a CRM/ESP.

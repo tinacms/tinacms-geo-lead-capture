@@ -57,6 +57,13 @@ test('a missing or malformed signature never verifies', () => {
   assert.ok(!verifyReport(r, 'a'.repeat(64)));
 });
 
+test('a missing report is rejected rather than throwing', () => {
+  const sig = signReport(emailReport(report));
+  assert.ok(!verifyReport(null, sig));
+  assert.ok(!verifyReport(undefined, sig));
+  assert.ok(!verifyReport('not an object', sig));
+});
+
 test('no key means nothing verifies', () => {
   const r = emailReport(report);
   const sig = signReport(r);

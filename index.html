@@ -24,6 +24,13 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/geo/styles.css" />
+    <!-- Explicit render: the lead gate is injected after the analysis returns,
+         so Turnstile's automatic scan would have run long before it exists. -->
+    <script
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileReady"
+      async
+      defer
+    ></script>
   </head>
   <body>
     <header class="site-header">

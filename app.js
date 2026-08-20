@@ -259,6 +259,7 @@ const leadGate = (report) => `
       <form id="lead-form">
         <input type="email" id="lead-email" placeholder="you@company.com" aria-label="Your email" />
         <input type="tel" id="lead-phone" placeholder="+1 555 555 555" aria-label="Your phone number" autocomplete="tel" />
+        <div class="turnstile" id="turnstile-slot"></div>
         <button class="btn cta-btn" type="submit" id="lead-btn">Email me the full report</button>
       </form>
       <p class="error" id="lead-error" role="alert" aria-live="polite"></p>
@@ -505,11 +506,48 @@ const renderResults = (report) => {
   }
 };
 
+// Public site key — it is meant to ship in the page. The secret half lives in
+// TURNSTILE_SECRET_KEY on the server.
+const TURNSTILE_SITE_KEY = '0x4AAAAAAEWMs9oLHfaRF-eI';
+
+// The Turnstile script sits in <head> while this module is deferred, so it may
+// well have loaded — and fired its onload — before this line runs. Testing for
+// window.turnstile rather than trusting the callback covers both orders; the
+// event is only the fallback for a script that is still in flight.
+window.onTurnstileReady = () => window.dispatchEvent(new Event('turnstile-ready'));
+const whenTurnstile = (fn) => {
+  if (window.turnstile) {
+    fn();
+  } else {
+    window.addEventListener('turnstile-ready', fn, { once: true });
+  }
+};
+
 const wireLeadForm = (report) => {
   const form = $('#lead-form');
   if (!form) {
     return;
   }
+  // Managed mode usually solves itself in under a second, so the token is
+  // normally waiting by the time anyone finishes typing an email.
+  let token = '';
+  let widgetId = null;
+  whenTurnstile(() => {
+    widgetId = window.turnstile.render('#turnstile-slot', {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (t) => {
+        token = t;
+      },
+      // Tokens are single-use and expire after five minutes; clearing on both
+      // means a stale one is never sent.
+      'error-callback': () => {
+        token = '';
+      },
+      'expired-callback': () => {
+        token = '';
+      },
+    });
+  });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = $('#lead-email').value.trim();
@@ -540,10 +578,17 @@ const wireLeadForm = (report) => {
           // this object, so rebuilding it here would invalidate it.
           report: report.emailReport,
           sig: report.sig,
+          turnstileToken: token,
         }),
       });
     } catch {
       // Never hold the report hostage to the CRM.
+    }
+    // Single-use token: if this form is ever submitted twice, the second one
+    // needs a fresh challenge.
+    if (widgetId !== null) {
+      window.turnstile.reset(widgetId);
+      token = '';
     }
     $('#gate-slot').innerHTML = fullReport(report);
     wireAccordion();

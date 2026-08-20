@@ -780,6 +780,17 @@ input:focus {
   margin: 1.5rem auto 0;
 }
 
+/* Turnstile renders a fixed 300px iframe; centre it and let the row collapse
+   to nothing until the widget actually mounts. */
+.turnstile {
+  display: flex;
+  justify-content: center;
+}
+
+.turnstile:empty {
+  display: none;
+}
+
 /* Categories */
 .category {
   overflow: hidden;
