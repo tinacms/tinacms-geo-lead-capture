@@ -191,11 +191,35 @@ export function isAllowed(robots, agent, path) {
 
 // --- tiny HTML extraction helpers (regex, deliberately narrow) ---------------
 
+// Drops each open..close region in one linear pass. The obvious
+// `.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')` is quadratic on a document
+// full of unclosed openings — every one of them scans to EOF hunting a close
+// that isn't there — and these can't be length-bounded the way the tag-pair
+// scans below are, because an inline script or style block is legitimately
+// hundreds of KB. Splitting on the opener and then taking one indexOf per piece
+// touches each byte a fixed number of times instead.
+//
+// Dropping to end-of-document when the closing tag is missing is also what a
+// real HTML parser does: an unclosed <script> swallows the rest of the page.
+const stripRegions = (s, openRe, close) => {
+  const parts = s.split(openRe);
+  let out = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    const end = parts[i].indexOf(close);
+    if (end === -1) {
+      return `${out} `;
+    }
+    out += ` ${parts[i].slice(end + close.length)}`;
+  }
+  return out;
+};
+
 const stripScripts = (html) =>
-  html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ');
+  stripRegions(
+    stripRegions(stripRegions(html, /<script\b[^>]*>/gi, '</script>'), /<style\b[^>]*>/gi, '</style>'),
+    /<!--/g,
+    '-->',
+  );
 
 const decode = (s) =>
   s
@@ -214,8 +238,15 @@ const textContent = (html) =>
       .replace(/\s+/g, ' '),
   );
 
+// Every tag-pair scan below is bounded rather than `[\s\S]*?`. An unbounded
+// lazy scan runs to the end of the document whenever the closing tag is
+// missing, and it does that once per opening tag — so a page of unclosed tags
+// costs O(tags x bytes). 3MB of `<a href="#">x` took 51s before these bounds,
+// against 86ms for the same weight of ordinary prose, which overran the 30s
+// function limit on a single request. Bounds are generous enough that no real
+// document notices; see the guard in engine.test.mjs.
 const getTitle = (html) => {
-  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const m = html.match(/<title[^>]*>([\s\S]{0,2000}?)<\/title>/i);
   return m ? decode(m[1].replace(/<[^>]+>/g, ' ')) : '';
 };
 
@@ -230,7 +261,7 @@ const metaContent = (html, key) => {
 
 const headings = (html) => {
   const out = [];
-  const re = /<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi;
+  const re = /<h([1-6])[^>]*>([\s\S]{0,2000}?)<\/h\1>/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     out.push({ level: Number(m[1]), text: decode(m[2].replace(/<[^>]+>/g, ' ')) });
@@ -241,7 +272,11 @@ const headings = (html) => {
 const jsonLdTypes = (html) => {
   const types = [];
   const re =
-    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    // Roomier than the others, since a FAQPage or product block is legitimately
+    // several KB and missing one would cost a real site score. 20KB is the
+    // balance point: cost scales linearly with this bound, and 50KB put the
+    // worst case back near 9s.
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]{0,20000}?)<\/script>/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     try {
@@ -754,7 +789,7 @@ export function analyzeHtml(input) {
   );
 
   // 5. Agentic web (emerging, mostly informational) ---------------------------
-  const interactive = html.match(/<(a|button)\b[^>]*>[\s\S]*?<\/\1>/gi) ?? [];
+  const interactive = html.match(/<(a|button)\b[^>]*>[\s\S]{0,2000}?<\/\1>/gi) ?? [];
   const unnamed = interactive.filter((el) => {
     const inner = decode(el.replace(/<[^>]+>/g, ' '));
     const hasName =

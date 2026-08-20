@@ -202,3 +202,63 @@ test('strips HTML tags out of extracted title text (defense in depth)', () => {
   assert.ok(!title.detail.includes('<img'));
   assert.ok(!title.detail.includes('onerror'));
 });
+
+// Unbounded `[\s\S]*?` tag-pair scans are quadratic on unclosed tags: each
+// opening tag scans to the end of the document looking for a close that never
+// comes. 3MB of these took 51s, overrunning the 30s function limit on a single
+// request. The bounds in engine.mjs cap it; this fails if they are removed.
+test('a page of unclosed tags does not blow up parsing time', () => {
+  const frags = [
+    '<a href="#">x',
+    '<h1>x',
+    '<script type="application/ld+json">x',
+    '<script>x',
+    '<style>x',
+    '<!--x',
+  ];
+  for (const frag of frags) {
+    const html = `<html><body>${frag.repeat(Math.ceil(1_000_000 / frag.length))}</body></html>`;
+    const started = process.hrtime.bigint();
+    analyzeHtml(base(html));
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    // ~180ms bounded, ~5700ms unbounded — a 10x margin either side, so a loaded
+    // CI box won't flake it.
+    assert.ok(ms < 2000, `1MB of "${frag}" took ${ms.toFixed(0)}ms; bounds likely removed`);
+  }
+});
+
+// The flip side of the bound: it has to stay clear of real structured data.
+// A block over 20KB is dropped by design — that is the price of the cap.
+test('a large but realistic JSON-LD block still parses', () => {
+  const bigLd = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: Array.from({ length: 80 }, (_, i) => ({
+      '@type': 'Question',
+      name: `Question ${i}?`,
+      acceptedAnswer: { '@type': 'Answer', text: 'x'.repeat(100) },
+    })),
+  });
+  assert.ok(bigLd.length > 15_000, 'fixture should be large enough to matter');
+  assert.ok(bigLd.length < 20_000, 'fixture should sit inside the bound');
+  const html = `<html><head><title>T</title><script type="application/ld+json">${bigLd}</script></head><body><h1>Heading</h1></body></html>`;
+  const r = analyzeHtml(base(html));
+  const jsonld = r.categories
+    .find((c) => c.id === 'structured')
+    .checks.find((c) => c.id === 'jsonld');
+  assert.ok(jsonld.detail.includes('FAQPage'), `a ${bigLd.length}-byte block should still parse`);
+});
+
+test('script, style and comment contents stay out of the visible text', () => {
+  const html = `<html><head><title>Real title</title>
+    <script>const secretWord = "scriptleak scriptleak scriptleak";</script>
+    <style>.a{content:"styleleak styleleak"}</style></head>
+    <body><!-- commentleak commentleak --><h1>Real heading</h1>
+    <p>${'genuine prose about the subject matter '.repeat(40)}</p></body></html>`;
+  const r = analyzeHtml(base(html));
+  const serialized = JSON.stringify(r);
+  assert.ok(!serialized.includes('scriptleak'), 'script body leaked into analysis');
+  assert.ok(!serialized.includes('styleleak'), 'style body leaked into analysis');
+  assert.ok(!serialized.includes('commentleak'), 'comment body leaked into analysis');
+  assert.ok(serialized.includes('Real heading') || serialized.includes('Real title'));
+});
