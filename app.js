@@ -566,7 +566,7 @@ const wireLeadForm = (report) => {
     btn.disabled = true;
     btn.textContent = 'Sending…';
     try {
-      await fetch('/geo/api/lead', {
+      const res = await fetch('/geo/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -581,6 +581,20 @@ const wireLeadForm = (report) => {
           turnstileToken: token,
         }),
       });
+      // The firewall's 429 is the one failure worth keeping the gate open for:
+      // it is temporary and retrying works. Every other failure still falls
+      // through and reveals the report, because none of them are the user's
+      // problem. Note this response comes from the edge, so it is not our JSON.
+      if (res.status === 429) {
+        showError(errEl, 'Too many requests, please wait before resubmitting.');
+        btn.disabled = false;
+        btn.textContent = 'Email me the full report';
+        if (widgetId !== null) {
+          window.turnstile.reset(widgetId);
+          token = '';
+        }
+        return;
+      }
     } catch {
       // Never hold the report hostage to the CRM.
     }
@@ -622,6 +636,13 @@ $('#analyze-form').addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
     });
+    // Checked before parsing: a firewall 429 is served from the edge and is not
+    // our JSON, so res.json() would throw and surface as a connection error.
+    if (res.status === 429) {
+      await minLoad;
+      fail('Too many requests, please wait before resubmitting.');
+      return;
+    }
     const data = await res.json();
     if (!res.ok) {
       fail(data.error || 'We couldn’t analyze that page. Try another URL.');
