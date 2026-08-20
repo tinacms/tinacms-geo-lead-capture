@@ -536,15 +536,10 @@ const wireLeadForm = (report) => {
           phone,
           website: report.finalUrl,
           note: `AI Search Readiness: ${report.finalUrl} scored ${report.overall}/100 (${report.grade}).`,
-          report: {
-            url: report.finalUrl,
-            overall: report.overall,
-            grade: report.grade,
-            passCount: report.passCount,
-            totalScored: report.totalScored,
-            categories: report.categories.map((c) => ({ title: c.title, score: c.score })),
-            topFixes: report.topFixes.map((f) => ({ label: f.label, why: f.why })),
-          },
+          // Passed back exactly as /api/analyze sent it — the signature is over
+          // this object, so rebuilding it here would invalidate it.
+          report: report.emailReport,
+          sig: report.sig,
         }),
       });
     } catch {

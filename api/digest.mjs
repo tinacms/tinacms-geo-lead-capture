@@ -94,12 +94,13 @@ async function sendDigest(to, leads, days) {
 }
 
 export default async function handler(req, res) {
+  // Required, not optional: unauthenticated this endpoint both fires the digest
+  // on demand and returns the internal recipient list.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.authorization === `Bearer ${secret}`;
-    const q = new URL(req.url, 'http://x').searchParams.get('secret') === secret;
-    if (!auth && !q) return res.status(401).end('Unauthorized');
-  }
+  if (!secret) return res.status(500).end('CRON_SECRET not set');
+  const auth = req.headers.authorization === `Bearer ${secret}`;
+  const q = new URL(req.url, 'http://x').searchParams.get('secret') === secret;
+  if (!auth && !q) return res.status(401).end('Unauthorized');
 
   const token = process.env.HUBSPOT_TOKEN;
   const to = (process.env.DIGEST_TO || '')

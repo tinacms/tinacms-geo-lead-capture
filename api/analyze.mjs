@@ -1,4 +1,5 @@
 import { analyzeHtml } from './_lib/engine.mjs';
+import { emailReport, signReport } from './_lib/sign.mjs';
 import {
   negotiateMarkdown,
   normalizeUrl,
@@ -92,7 +93,10 @@ export default async function handler(req, res) {
       wellKnown,
       fetchedAt: new Date().toISOString(),
     });
-    return json(res, 200, report);
+    // The emailable slice travels back signed, so /api/lead can tell a report we
+    // produced from one someone made up.
+    const emailable = emailReport(report);
+    return json(res, 200, { ...report, emailReport: emailable, sig: signReport(emailable) });
   } catch (err) {
     const MESSAGES = {
       UNRESOLVABLE_HOST: 'We couldn’t find that domain. Check the spelling and try again.',

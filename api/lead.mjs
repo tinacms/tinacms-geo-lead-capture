@@ -4,6 +4,8 @@
 // Env: MAILCHIMP_API_KEY (form key-usX), MAILCHIMP_AUDIENCE_ID,
 //      SENDGRID_API_KEY, LEAD_FROM_EMAIL (defaults to hello@tina.io).
 
+import { verifyReport } from './_lib/sign.mjs';
+
 const json = (res, status, body) => {
   res.status(status).setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(body));
@@ -232,6 +234,7 @@ export default async function handler(req, res) {
   let email;
   let note = '';
   let report = null;
+  let sig = '';
   let phone = '';
   let website = '';
   try {
@@ -240,6 +243,7 @@ export default async function handler(req, res) {
     email = body.email;
     note = typeof body.note === 'string' ? body.note.slice(0, 500) : '';
     report = body.report && typeof body.report === 'object' ? body.report : null;
+    sig = typeof body.sig === 'string' ? body.sig : '';
     phone = typeof body.phone === 'string' ? body.phone.slice(0, 40) : '';
     website = typeof body.website === 'string' ? body.website.slice(0, 300) : '';
   } catch {
@@ -247,6 +251,12 @@ export default async function handler(req, res) {
   }
   if (!isEmail(email)) {
     return json(res, 400, { error: 'Enter a valid email address.' });
+  }
+  // We only email reports we generated. Anything else is someone using our
+  // sender to deliver their own text, so refuse the whole request rather than
+  // quietly dropping the report and still touching the CRM.
+  if (report && !verifyReport(report, sig)) {
+    return json(res, 400, { error: 'Invalid request.' });
   }
 
   // All best-effort — never hold the user's report hostage to a CRM/ESP.
