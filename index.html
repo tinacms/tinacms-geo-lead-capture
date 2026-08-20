@@ -9,7 +9,8 @@
       content="Score any page for SEO and answer-engine optimization (AEO/GEO) in seconds. Every check is graded against Google's own guidance and published research."
     />
     <link rel="canonical" href="https://tina.io/geo" />
-    <link rel="icon" href="/geo/tina-logo.svg" type="image/svg+xml" />
+    <!-- Same favicon as tina.io, copied from tina.io/favicon/favicon.ico -->
+    <link rel="icon" href="/geo/favicon.ico" sizes="any" />
     <meta property="og:title" content="AI Search Readiness Checker" />
     <meta
       property="og:description"
@@ -58,10 +59,8 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </form>
-        <p class="error hidden" id="form-error"></p>
-        <p class="microcopy">
-          No signup to see your score. We only read your page&rsquo;s public HTML.
-        </p>
+        <!-- Always in the DOM so showing an error never shifts the layout -->
+        <p class="error" id="form-error" role="alert" aria-live="polite"></p>
       </section>
 
       <main class="results hidden" id="results"></main>
