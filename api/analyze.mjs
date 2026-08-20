@@ -94,12 +94,17 @@ export default async function handler(req, res) {
     });
     return json(res, 200, report);
   } catch (err) {
+    const MESSAGES = {
+      UNRESOLVABLE_HOST: 'We couldn’t find that domain. Check the spelling and try again.',
+      BLOCKED_HOST: 'That looks like a private or internal address, so we can’t reach it.',
+      TOO_MANY_REDIRECTS: 'That URL redirected too many times. Try the page it ends up on.',
+      BAD_REDIRECT: 'That URL redirected somewhere we can’t follow. Try the final page instead.',
+    };
     const msg =
-      err?.message === 'BLOCKED_HOST'
-        ? 'That host is not allowed.'
-        : err?.name === 'AbortError'
-          ? 'The page took too long to respond.'
-          : 'Could not reach that URL. Check it is public and try again.';
+      MESSAGES[err?.message] ??
+      (err?.name === 'AbortError'
+        ? 'That page took too long to respond. Try again, or try a different page.'
+        : 'We couldn’t load that page. Check it’s public and try again.');
     return json(res, 422, { error: msg });
   }
 }

@@ -36,19 +36,22 @@ const isPrivateIp = (ip) => {
   );
 };
 
-const hostResolvesPrivate = async (hostname) => {
+// 'ok' | 'private' | 'unresolvable'. Both non-ok results block the fetch; they
+// are distinguished only so the user gets an accurate message, because a typo'd
+// domain and a deliberately blocked one are very different mistakes.
+const hostStatus = async (hostname) => {
   if (isIP(hostname)) {
-    return isPrivateIp(hostname);
+    return isPrivateIp(hostname) ? 'private' : 'ok';
   }
   const lower = hostname.toLowerCase();
   if (lower === 'localhost' || lower.endsWith('.localhost') || lower.endsWith('.local')) {
-    return true;
+    return 'private';
   }
   try {
     const records = await dns.lookup(hostname, { all: true });
-    return records.some((r) => isPrivateIp(r.address));
+    return records.some((r) => isPrivateIp(r.address)) ? 'private' : 'ok';
   } catch {
-    return true; // unresolvable -> treat as unsafe
+    return 'unresolvable';
   }
 };
 
@@ -69,8 +72,9 @@ export const normalizeUrl = (raw) => {
 export const safeFetch = async (start) => {
   let current = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (await hostResolvesPrivate(current.hostname)) {
-      throw new Error('BLOCKED_HOST');
+    const status = await hostStatus(current.hostname);
+    if (status !== 'ok') {
+      throw new Error(status === 'private' ? 'BLOCKED_HOST' : 'UNRESOLVABLE_HOST');
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
