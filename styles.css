@@ -756,6 +756,7 @@ input:focus {
      overflow the card and shove the lock off-screen */
   overflow-wrap: anywhere;
   min-width: 0;
+  margin-inline: auto;
   font-family: var(--font-head);
   font-weight: 600;
   line-height: 1.05;
@@ -763,6 +764,26 @@ input:focus {
   /* Same ramp as the "Talk to a Tina Expert" banner heading, so the two
      section headings read as the same level. */
   font-size: clamp(1.75rem, 3.6vw, 2.5rem);
+}
+
+/* A long hostname cannot sit at full heading size without filling the card and
+   breaking mid-word, so step the whole heading down. Short hosts keep the
+   larger size, which is the common case. */
+.gate-title.is-long {
+  font-size: clamp(1.3rem, 2.4vw, 1.7rem);
+  max-width: 26rem;
+}
+
+/* Break before the host rather than mid-label, so it reads
+   "See full report for" / "long-host.example.com" */
+.gate-title.is-long .gate-host {
+  display: block;
+}
+
+/* Break the host at its punctuation rather than anywhere in the string */
+.gate-host {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .gate p {

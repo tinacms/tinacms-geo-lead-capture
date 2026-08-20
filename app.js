@@ -251,9 +251,9 @@ const leadGate = (report) => `
   <div class="gate reveal" id="gate">
     <div class="peek" aria-hidden="true"><span style="width:66%"></span><span style="width:50%"></span><span style="width:75%"></span><span style="width:40%"></span></div>
     <div class="inner">
-      <h3 class="gate-title">
+      <h3 class="gate-title${reportHost(report).length > 16 ? ' is-long' : ''}">
         <span class="lock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-        See full report for ${esc(reportHost(report))}
+        <span>See full report for <span class="gate-host">${esc(reportHost(report))}</span></span>
       </h3>
       <p>Unlock all ${report.totalScored} checks with the exact fix and the evidence behind each one, plus where to go next. We&rsquo;ll email you a copy.</p>
       <form id="lead-form">
