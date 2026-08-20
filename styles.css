@@ -269,6 +269,10 @@ input:focus {
   align-items: flex-start;
   gap: 0.5rem;
   text-align: left;
+  /* Same width and centring as .analyze-form, so the message starts flush with
+     the left edge of the input it refers to rather than the section. */
+  max-width: 34rem;
+  margin-inline: auto;
   color: #b42318;
   font-size: 0.95rem;
   opacity: 0;
@@ -372,7 +376,9 @@ input:focus {
 }
 .ed-num {
   font-weight: 700;
-  font-size: clamp(5.5rem, 12vw, 9rem);
+  /* 22vw rather than 12vw so the size is continuous across the 680px
+     breakpoint; at 12vw it dropped from 160px to 92px crossing it. */
+  font-size: clamp(5.5rem, 22vw, 9rem);
   font-variant-numeric: tabular-nums;
 }
 .ed-bar {
@@ -407,30 +413,37 @@ input:focus {
     transform: translateX(400%);
   }
 }
-/* TinaCMS mark above the score: this block is what gets screenshotted and
-   shared, so it should carry the brand on its own. */
-.ed-brand {
+/* Host on its own line, check count beneath it, with the llama as a byline
+   mark to the left. Beside the score it read as an exponent; here it has a
+   baseline to sit on. */
+/* Flex row with an explicit image height, not a grid row-span with
+   align-self: stretch. Stretching an <img> with height:auto is laid out
+   differently by WebKit, where the image collapsed and painted over the text. */
+.ed-scored {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin-bottom: 0.75rem;
-  font-family: var(--font-head);
-  font-weight: 600;
+  margin-top: 0.8rem;
   font-size: 0.9rem;
-  letter-spacing: 0.01em;
   color: var(--text-2);
 }
 
-.ed-brand img {
-  height: 20px;
+.ed-llama {
+  flex-shrink: 0;
+  height: 2.65rem;
   width: auto;
 }
 
-.ed-scored {
-  display: block;
-  margin-top: 0.7rem;
-  font-size: 0.9rem;
-  color: var(--text-2);
+.ed-scored-text {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.ed-scored .ed-host {
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .ed-stats {
@@ -492,6 +505,11 @@ input:focus {
   }
   .ed-stats {
     min-width: min(24rem, 88vw);
+  }
+  /* Stacked layout gives the score the full width, so scale it to the viewport
+     instead of sitting on the desktop clamp's 5.5rem floor. */
+  .ed-num {
+    font-size: min(30vw, 10rem);
   }
 }
 
@@ -592,7 +610,8 @@ input:focus {
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  /* Pill, matching every other button */
+  border-radius: 999px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -708,7 +727,9 @@ input:focus {
 .gate .inner {
   position: relative;
   text-align: center;
-  padding: 3rem 1.5rem;
+  /* Less bottom padding than top: the error row below the button already
+     reserves its own space, so an even 3rem left a dead gap. */
+  padding: 3rem 1.5rem 1.25rem;
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), #fff);
 }
 
@@ -1367,11 +1388,9 @@ footer.site {
   max-width: 30rem;
 }
 
-/* tina.io's CTA button is a 6px rounded rectangle, not the pill used elsewhere.
-   Shape only, so the same class gives the gate's submit button and the "Schedule
-   Call" button an identical look. */
+/* Pill everywhere, matching .btn. Shape is inherited; this class only equalises
+   size, so the gate's submit button and "Schedule Call" look identical. */
 .cta-btn {
-  border-radius: 6px;
   padding: 0.7rem 1.5rem;
   font-size: 1rem;
 }
@@ -1385,6 +1404,11 @@ footer.site {
 .gate form .cta-btn {
   align-self: center;
   margin-top: 0.5rem;
+}
+
+/* The gate's error sits close under the button; it still reserves its row. */
+.gate .error {
+  margin-top: 0.6rem;
 }
 
 .cta-llama-outline {

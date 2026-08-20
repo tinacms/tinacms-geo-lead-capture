@@ -262,7 +262,6 @@ const leadGate = (report) => `
         <button class="btn cta-btn" type="submit" id="lead-btn">Email me the full report</button>
       </form>
       <p class="error" id="lead-error" role="alert" aria-live="polite"></p>
-      <p class="microcopy">No spam. Unsubscribe anytime.</p>
     </div>
   </div>`;
 
@@ -383,10 +382,6 @@ const countUp = (el, to, ms, colorize) => {
 const editorialShell = () => `
   <div class="editorial loading" id="editorial">
     <div class="ed-main">
-      <span class="ed-brand">
-        <img src="/geo/tina-logo.svg" alt="TinaCMS" height="20" />
-        <span>AI Search Readiness</span>
-      </span>
       <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
       <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
       <span class="ed-scored" id="ed-scored"></span>
@@ -405,7 +400,12 @@ const startEditorial = () => {
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
   $('#ed-stats').innerHTML = edStats(report);
-  $('#ed-scored').textContent = `${reportHost(report)} · ${report.passCount}/${report.totalScored} checks passed`;
+  $('#ed-scored').innerHTML =
+    `<img class="ed-llama" src="/geo/llama.svg" alt="TinaCMS" width="22" height="30" />` +
+    `<span class="ed-scored-text">` +
+    `<span class="ed-host">${esc(reportHost(report))}</span>` +
+    `<span class="ed-count">${report.passCount}/${report.totalScored} checks passed</span>` +
+    `</span>`;
   countUp($('#ed-num'), report.overall, 900, true);
   const bar = $('#ed-bar-fill');
   bar.style.setProperty('--w', `${report.overall}%`);
