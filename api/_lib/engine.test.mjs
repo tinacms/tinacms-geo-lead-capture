@@ -262,3 +262,35 @@ test('script, style and comment contents stay out of the visible text', () => {
   assert.ok(!serialized.includes('commentleak'), 'comment body leaked into analysis');
   assert.ok(serialized.includes('Real heading') || serialized.includes('Real title'));
 });
+
+test('does not penalise correctly-marked decorative images', () => {
+  const base2 = (html) => base(html);
+  // A decorative image is marked alt="" plus aria-hidden. Demanding alt text on
+  // it would make the page worse for screen readers, so it is excluded, not failed.
+  const decorative = analyzeHtml(
+    base2('<html><head><title>A perfectly fine page title</title></head><body>' +
+      '<img src="hero.png" alt="A described hero image">' +
+      '<img src="swirl.svg" alt="" aria-hidden="true">' +
+      '<img src="rule.svg" alt="" role="presentation">' +
+      '</body></html>'),
+  );
+  const alt = checkOf(decorative, 'fundamentals', 'alt');
+  assert.equal(alt.status, 'pass');
+  assert.match(alt.detail, /1 of 1 meaningful images/);
+
+  // An empty alt with no decorative marking is still a genuine miss.
+  const sloppy = analyzeHtml(
+    base2('<html><head><title>A perfectly fine page title</title></head><body>' +
+      '<img src="a.png" alt=""><img src="b.png" alt=""><img src="c.png" alt="described">' +
+      '</body></html>'),
+  );
+  assert.equal(checkOf(sloppy, 'fundamentals', 'alt').status, 'fail');
+});
+
+test('recognises SoftwareApplication and WebApplication as content types', () => {
+  const html =
+    '<html><head><title>A perfectly fine page title</title>' +
+    '<script type="application/ld+json">{"@type":"WebApplication","name":"x"}</script>' +
+    '</head><body>hi</body></html>';
+  assert.equal(checkOf(analyzeHtml(base(html)), 'structured', 'schematypes').status, 'pass');
+});

@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Colours sampled directly from og-geo.png so the set stays consistent */
+      :root {
+        --dark: #121214;
+        --orange: #e95a31;
+        --coral: #fe9270;
+        --muted: #7d7d86;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { background: var(--dark); }
+
+      .card {
+        position: relative;
+        overflow: hidden;
+        background: var(--dark);
+        /* Faint dot grid, as on the original card */
+        background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1.4px, transparent 1.4px);
+        background-size: 26px 26px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      /* Orange field with the same soft organic edge as the landscape card */
+      .field {
+        position: absolute;
+        background: var(--orange);
+        z-index: 0;
+      }
+
+      .llama {
+        position: absolute;
+        z-index: 1;
+        filter: drop-shadow(0 24px 60px rgba(0, 0, 0, 0.35));
+      }
+
+      .top, .bottom { position: relative; z-index: 2; }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55em;
+        background: #fff;
+        color: #121214;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        border-radius: 999px;
+      }
+      .pill::before {
+        content: '';
+        width: 0.62em;
+        height: 0.62em;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+
+      h1 {
+        font-family: 'IBM Plex Sans', sans-serif;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+      }
+      h1 .accent { color: var(--coral); }
+
+      .cta {
+        font-family: 'Inter', sans-serif;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .cta strong { color: #fff; font-weight: 600; }
+
+      .logo { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="card"></div>
+    <script>
+      // One template, three crops. Each preset only varies geometry and scale.
+      const PRESETS = {
+        // The orange field must clear the headline: coral text on orange is
+        // unreadable, so it sits right of the type, never behind it.
+        square:   { w: 1080, h: 1080, pad: 84,  h1: 88,  pill: 26, cta: 30, logo: 132,
+                    field: 'right:-30%; top:-6%; width:78%; height:86%; border-radius:46% 54% 40% 60% / 52% 44% 56% 48%;',
+                    llama: 'right:-4%; bottom:-3%; width:66%;' },
+        portrait: { w: 1080, h: 1350, pad: 92,  h1: 104, pill: 28, cta: 32, logo: 144,
+                    field: 'right:-34%; top:26%; width:82%; height:62%; border-radius:48% 52% 42% 58% / 50% 46% 54% 50%;',
+                    llama: 'right:-6%; bottom:4%; width:70%;' },
+        story:    { w: 1080, h: 1920, pad: 96,  h1: 112, pill: 30, cta: 34, logo: 152,
+                    field: 'right:-28%; top:30%; width:88%; height:48%; border-radius:46% 54% 44% 56% / 48% 48% 52% 52%;',
+                    llama: 'right:-8%; bottom:16%; width:74%;' },
+      };
+
+      const preset = PRESETS[new URLSearchParams(location.search).get('p') || 'square'];
+      const card = document.getElementById('card');
+      card.style.cssText = `width:${preset.w}px; height:${preset.h}px; padding:${preset.pad}px;`;
+      card.innerHTML = `
+        <div class="field" style="${preset.field}"></div>
+        <img class="llama" style="${preset.llama}" src="llama-vr.png" />
+        <div class="top">
+          <span class="pill" style="font-size:${preset.pill}px; padding:${preset.pill * 0.62}px ${preset.pill * 1.15}px;">Free Tool</span>
+          <h1 style="font-size:${preset.h1}px; margin-top:${preset.pad * 0.62}px;">
+            Is your site<br />ready for<br /><span class="accent">AI search?</span>
+          </h1>
+        </div>
+        <div class="bottom">
+          <p class="cta" style="font-size:${preset.cta}px; margin-bottom:${preset.pad * 0.34}px;">
+            Check yours at <strong>tina.io/geo</strong>
+          </p>
+          <img class="logo" src="tina-logo.svg" style="width:${preset.logo}px;" />
+        </div>`;
+    </script>
+  </body>
+</html>

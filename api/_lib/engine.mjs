@@ -367,7 +367,15 @@ export function analyzeHtml(input) {
   const invalidJsonLd = allTypes.includes('__invalid__');
   const ext = externalDomains(html, finalUrl);
   const imgs = html.match(/<img\b[^>]*>/gi) ?? [];
-  const imgsWithAlt = imgs.filter((t) => /alt=["'][^"']+["']/i.test(t));
+  // A decorative image is correctly marked with an empty alt plus aria-hidden or
+  // role="presentation". Counting those as "missing alt text" would push people
+  // to add noise that screen readers then have to read out, so they are excluded
+  // from the check rather than failed.
+  const isDecorative = (t) =>
+    /alt=["']\s*["']/i.test(t) &&
+    /aria-hidden=["']true["']|role=["']presentation["']/i.test(t);
+  const meaningfulImgs = imgs.filter((t) => !isDecorative(t));
+  const imgsWithAlt = meaningfulImgs.filter((t) => /alt=["'][^"']+["']/i.test(t));
   const lists = (html.match(/<(ul|ol|table)\b/gi) ?? []).length;
   const blockquotes = (html.match(/<blockquote\b/gi) ?? []).length;
   // Percentages, currency, large formatted numbers, and decimals with a unit
@@ -537,7 +545,7 @@ export function analyzeHtml(input) {
   const viewport = /name=["']viewport["']/i.test(html);
   const lang = /<html[^>]+lang=["'][^"']+["']/i.test(html);
   const og = !!metaContent(html, 'og:title') || !!metaContent(html, 'og:description');
-  const altRatio = imgs.length ? imgsWithAlt.length / imgs.length : 1;
+  const altRatio = meaningfulImgs.length ? imgsWithAlt.length / meaningfulImgs.length : 1;
   add(
     'fundamentals',
     'Search fundamentals',
@@ -618,11 +626,11 @@ export function analyzeHtml(input) {
         id: 'alt',
         label: 'Images have alt text',
         status:
-          imgs.length === 0 ? 'pass' : altRatio >= 0.8 ? 'pass' : altRatio >= 0.5 ? 'warn' : 'fail',
+          meaningfulImgs.length === 0 ? 'pass' : altRatio >= 0.8 ? 'pass' : altRatio >= 0.5 ? 'warn' : 'fail',
         detail:
-          imgs.length === 0
-            ? 'No <img> elements to check.'
-            : `${imgsWithAlt.length} of ${imgs.length} images have alt text.`,
+          meaningfulImgs.length === 0
+            ? 'No <img> elements needing alt text.'
+            : `${imgsWithAlt.length} of ${meaningfulImgs.length} meaningful images have alt text.`,
         fix: 'Add descriptive alt text to meaningful images.',
         why: 'Alt text is content engines can read and a core accessibility requirement.',
         weight: 3,
@@ -648,7 +656,7 @@ export function analyzeHtml(input) {
   //  - hasSchemaType: did the page pick a recognized, page-appropriate type?
   //  - hasAuthorEntity: is authorship/publisher declared (the E-E-A-T signal)?
   const hasSchemaType = types.some((t) =>
-    /Article|NewsArticle|BlogPosting|Product|FAQPage|HowTo|Recipe|Event|Organization|LocalBusiness|WebSite|WebPage|BreadcrumbList|Review|Person|VideoObject|Course/i.test(
+    /Article|NewsArticle|BlogPosting|Product|FAQPage|HowTo|Recipe|Event|Organization|LocalBusiness|WebSite|WebPage|BreadcrumbList|Review|Person|VideoObject|Course|SoftwareApplication|WebApplication/i.test(
       t,
     ),
   );
