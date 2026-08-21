@@ -1602,45 +1602,91 @@ html.llama-mode body::after {
   to { opacity: 0.028; }
 }
 
-/* The llama stands in for the 1 in 100. It must sit on the same line as the
-   zeros, so the score cannot wrap. */
-.ed-num {
-  white-space: nowrap;
+/* The llama springs up beside the score once it lands, then dances a loop:
+   four shuffle hops, a crouch, and a spin. Three layers so the animations
+   never fight over transform: wrapper owns the entrance, img owns the
+   routine, ::after is the contact shadow. */
+.egg-dancer {
+  position: relative;
+  align-self: flex-end;
+  display: block;
+  margin-left: 0.7rem;
+  transform-origin: 50% 100%;
+  animation: egg-rise 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) 0.75s both;
 }
 
-.egg-one {
-  display: inline-block;
-  height: 0.74em;
+.egg-dancer img {
+  display: block;
+  height: clamp(3.8rem, 14vw, 6rem);
   width: auto;
-  /* Optically seated on the baseline, like a numeral rather than an image */
-  vertical-align: -0.02em;
-  margin-right: 0.04em;
-  animation: egg-pop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1) 0.15s both;
+  /* Feet stay planted, so squash and tilt pivot from the ground. */
+  transform-origin: 50% 100%;
+  animation: egg-dance 2.6s 1.35s infinite;
 }
 
-.egg-zeros {
-  color: var(--orange);
+/* Shrinks and fades on the airborne beats, which is what reads as a hop
+   rather than a wobble. */
+.egg-dancer::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -0.32rem;
+  width: 68%;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: rgb(15 23 42 / 0.16);
+  animation: egg-shadow 2.6s 1.35s infinite;
 }
 
-@keyframes egg-pop {
-  from { transform: translateY(0.18em) rotate(-8deg); opacity: 0; }
+@keyframes egg-rise {
+  from { transform: translateY(120%) scale(0.65); opacity: 0; }
   to   { transform: none; opacity: 1; }
 }
 
-.egg-truth {
-  display: block;
-  margin-top: 0.55rem;
-  font-size: 0.85rem;
-  color: var(--text-2);
-  animation: llama-fade-in 0.5s ease 1.1s both;
+/* Easing is per-segment rather than on the animation: ease-out up, ease-in
+   down. A single ease-in-out across the whole loop floats instead of bounces. */
+@keyframes egg-dance {
+  0% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(0deg) scale(1, 1);
+       animation-timing-function: ease-out; }
+  6% { transform: perspective(520px) translate(-2%, -32%) rotate(-12deg) rotateY(0deg) scale(0.94, 1.07);
+       animation-timing-function: ease-in; }
+  13% { transform: perspective(520px) translate(-4%, 0) rotate(-5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  19% { transform: perspective(520px) translate(0, -32%) rotate(12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  26% { transform: perspective(520px) translate(4%, 0) rotate(5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  32% { transform: perspective(520px) translate(2%, -32%) rotate(-12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  39% { transform: perspective(520px) translate(-4%, 0) rotate(-5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  45% { transform: perspective(520px) translate(0, -32%) rotate(12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  52% { transform: perspective(520px) translate(4%, 0) rotate(5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-in; }
+  /* Crouch, then a full turn on the spot. */
+  60% { transform: perspective(520px) translate(2%, 2%) rotate(0deg) rotateY(0deg) scale(1.14, 0.86);
+        animation-timing-function: ease-out; }
+  74% { transform: perspective(520px) translate(0, -42%) rotate(0deg) rotateY(180deg) scale(0.94, 1.06);
+        animation-timing-function: ease-in; }
+  86% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(360deg) scale(1.12, 0.88);
+        animation-timing-function: ease-out; }
+  93% { transform: perspective(520px) translate(0, -10%) rotate(0deg) rotateY(360deg) scale(0.98, 1.02);
+        animation-timing-function: ease-in; }
+  100% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(360deg) scale(1, 1); }
 }
 
-@keyframes llama-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+@keyframes egg-shadow {
+  0%, 13%, 26%, 39%, 52%, 86%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  60% { transform: translateX(-50%) scale(1.12); opacity: 1; }
+  6%, 19%, 32%, 45%, 93% { transform: translateX(-50%) scale(0.6); opacity: 0.42; }
+  74% { transform: translateX(-50%) scale(0.42); opacity: 0.28; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .llama-mode body::after { animation: none; opacity: 0.028; }
-  .egg-one, .egg-truth { animation: none; }
+  /* Still turns up, just stands still. */
+  .egg-dancer,
+  .egg-dancer img,
+  .egg-dancer::after { animation: none; }
 }

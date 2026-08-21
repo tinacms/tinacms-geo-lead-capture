@@ -385,7 +385,7 @@ const countUp = (el, to, ms, colorize) => {
 const editorialShell = () => `
   <div class="editorial loading" id="editorial">
     <div class="ed-main">
-      <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
+      <span class="ed-figure" id="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
       <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
       <span class="ed-scored" id="ed-scored"></span>
     </div>
@@ -401,10 +401,10 @@ const startEditorial = () => {
 };
 
 // Easter egg: analysing Tina's own site turns the whole score readout perfect —
-// a llama-shaped 100, every category at 100 in orange, all checks passing — and
-// tessellates the background. Display only: the report below still lists each
-// check's real status, and the markdown export, emailed report and CRM payload
-// all carry the true score.
+// 100, every category at 100 in orange, all checks passing — and tessellates the
+// background. Display only: the report below still lists each check's real
+// status, and the markdown export, emailed report and CRM payload all carry the
+// true score.
 const isTinaSite = (report) => /(^|\.)tina\.io$/.test(reportHost(report));
 
 const setEditorialLoaded = (report) => {
@@ -420,10 +420,16 @@ const setEditorialLoaded = (report) => {
     `</span>`;
 
   if (egg) {
-    // The "1" is the llama itself.
-    $('#ed-num').innerHTML =
-      `<img class="egg-one" src="/geo/llama-numeral.svg" alt="1" /><span class="egg-zeros">00</span>`;
     document.documentElement.classList.add('llama-mode');
+    const num = $('#ed-num');
+    countUp(num, 100, 900);
+    num.style.color = 'var(--orange)';
+    // Decorative, and it never appears off the egg path, so it lives here
+    // rather than in the shell.
+    $('#ed-figure').insertAdjacentHTML(
+      'beforeend',
+      `<span class="egg-dancer" aria-hidden="true"><img src="/geo/llama.svg" alt="" /></span>`,
+    );
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';
