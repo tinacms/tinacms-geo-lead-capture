@@ -348,11 +348,13 @@ const scoreColor = (n) => {
   return `hsl(${Math.round(hue)} 70% 44%)`;
 };
 
-const edStats = (report) =>
+// `egg` forces every row to a perfect orange 100 for the tina.io easter egg.
+const edStats = (report, egg = false) =>
   report.categories
     .map((cat, i) => {
-      const c = scoreColor(cat.score);
-      return `<li style="transition-delay:${(0.12 + i * 0.07).toFixed(2)}s"><span class="es-cat">${esc(cat.title)}</span><span class="es-track"><span class="es-fill" style="--w:${cat.score}%;background:${c}"></span></span><span class="es-num" style="color:${c}">${cat.score}</span></li>`;
+      const score = egg ? 100 : cat.score;
+      const c = egg ? 'var(--orange)' : scoreColor(score);
+      return `<li style="transition-delay:${(0.12 + i * 0.07).toFixed(2)}s"><span class="es-cat">${esc(cat.title)}</span><span class="es-track"><span class="es-fill" style="--w:${score}%;background:${c}"></span></span><span class="es-num" style="color:${c}">${score}</span></li>`;
     })
     .join('');
 
@@ -398,30 +400,29 @@ const startEditorial = () => {
   requestAnimationFrame(() => el.classList.add('in'));
 };
 
-// Easter egg: analysing Tina's own site swaps the score for a llama-shaped 100
-// and tessellates the background. The real score stays on screen underneath,
-// because a screenshot of a fake 100 from an honesty tool is not a joke worth
-// making.
+// Easter egg: analysing Tina's own site turns the whole score readout perfect —
+// a llama-shaped 100, every category at 100 in orange, all checks passing — and
+// tessellates the background. Display only: the report below still lists each
+// check's real status, and the markdown export, emailed report and CRM payload
+// all carry the true score.
 const isTinaSite = (report) => /(^|\.)tina\.io$/.test(reportHost(report));
 
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
-  $('#ed-stats').innerHTML = edStats(report);
+  const egg = isTinaSite(report);
+  $('#ed-stats').innerHTML = edStats(report, egg);
+  const passed = egg ? report.totalScored : report.passCount;
   $('#ed-scored').innerHTML =
     `<img class="ed-llama" src="/geo/llama.svg" alt="TinaCMS" width="22" height="30" />` +
     `<span class="ed-scored-text">` +
     `<span class="ed-host">${esc(reportHost(report))}</span>` +
-    `<span class="ed-count">${report.passCount}/${report.totalScored} checks passed</span>` +
+    `<span class="ed-count">${passed}/${report.totalScored} checks passed</span>` +
     `</span>`;
 
-  if (isTinaSite(report)) {
-    // The "1" is the llama itself, and the honest number sits right below it.
+  if (egg) {
+    // The "1" is the llama itself.
     $('#ed-num').innerHTML =
-      `<img class="egg-one" src="/geo/llama.svg" alt="1" /><span class="egg-zeros">00</span>`;
-    $('#ed-scored').insertAdjacentHTML(
-      'afterend',
-      `<span class="egg-truth">Alright, it&rsquo;s really ${report.overall}. We had to try. 🦙</span>`,
-    );
+      `<img class="egg-one" src="/geo/llama-numeral.svg" alt="1" /><span class="egg-zeros">00</span>`;
     document.documentElement.classList.add('llama-mode');
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');

@@ -1587,17 +1587,19 @@ html.llama-mode body::after {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url('/geo/llama.svg'), url('/geo/llama.svg');
-  /* Small tiles, half-offset for a brick tessellation. Kept very faint: it is
-     wallpaper behind a report, not the subject. */
-  background-size: 58px 80px, 58px 80px;
-  background-position: 0 0, 29px 40px;
+  /* llama-tile.svg pads the llama inside its tile. The first attempt tiled the
+     bare mark, which fills its box edge to edge, so the half-offset second layer
+     landed on top of the first and merged into an abstract blob rather than a
+     tessellation. */
+  background-image: url('/geo/llama-tile.svg'), url('/geo/llama-tile.svg');
+  background-size: 104px 78px, 104px 78px;
+  background-position: 0 0, 52px 39px;
   opacity: 0;
   animation: llama-fade 1.6s ease 0.35s forwards;
 }
 
 @keyframes llama-fade {
-  to { opacity: 0.045; }
+  to { opacity: 0.028; }
 }
 
 /* The llama stands in for the 1 in 100. It must sit on the same line as the
@@ -1639,6 +1641,6 @@ html.llama-mode body::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .llama-mode body::after { animation: none; opacity: 0.045; }
+  .llama-mode body::after { animation: none; opacity: 0.028; }
   .egg-one, .egg-truth { animation: none; }
 }
