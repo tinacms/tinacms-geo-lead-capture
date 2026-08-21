@@ -1576,3 +1576,71 @@ footer.site {
 .ssw-link:hover {
   text-decoration: underline;
 }
+
+/* --- Easter egg: analysing tina.io ------------------------------------------
+   Two offset llama layers make a proper tessellation rather than a plain grid.
+   Both fade in after the score lands, and honour reduced-motion. */
+.llama-mode body::after,
+html.llama-mode body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* llama-tile.svg pads the llama inside its tile. The first attempt tiled the
+     bare mark, which fills its box edge to edge, so the half-offset second layer
+     landed on top of the first and merged into an abstract blob rather than a
+     tessellation. */
+  background-image: url('/geo/llama-tile.svg'), url('/geo/llama-tile.svg');
+  background-size: 104px 78px, 104px 78px;
+  background-position: 0 0, 52px 39px;
+  opacity: 0;
+  animation: llama-fade 1.6s ease 0.35s forwards;
+}
+
+@keyframes llama-fade {
+  to { opacity: 0.028; }
+}
+
+/* The llama stands in for the 1 in 100. It must sit on the same line as the
+   zeros, so the score cannot wrap. */
+.ed-num {
+  white-space: nowrap;
+}
+
+.egg-one {
+  display: inline-block;
+  height: 0.74em;
+  width: auto;
+  /* Optically seated on the baseline, like a numeral rather than an image */
+  vertical-align: -0.02em;
+  margin-right: 0.04em;
+  animation: egg-pop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1) 0.15s both;
+}
+
+.egg-zeros {
+  color: var(--orange);
+}
+
+@keyframes egg-pop {
+  from { transform: translateY(0.18em) rotate(-8deg); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.egg-truth {
+  display: block;
+  margin-top: 0.55rem;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  animation: llama-fade-in 0.5s ease 1.1s both;
+}
+
+@keyframes llama-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .llama-mode body::after { animation: none; opacity: 0.028; }
+  .egg-one, .egg-truth { animation: none; }
+}
