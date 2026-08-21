@@ -398,6 +398,12 @@ const startEditorial = () => {
   requestAnimationFrame(() => el.classList.add('in'));
 };
 
+// Easter egg: analysing Tina's own site swaps the score for a llama-shaped 100
+// and tessellates the background. The real score stays on screen underneath,
+// because a screenshot of a fake 100 from an honesty tool is not a joke worth
+// making.
+const isTinaSite = (report) => /(^|\.)tina\.io$/.test(reportHost(report));
+
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
   $('#ed-stats').innerHTML = edStats(report);
@@ -407,6 +413,28 @@ const setEditorialLoaded = (report) => {
     `<span class="ed-host">${esc(reportHost(report))}</span>` +
     `<span class="ed-count">${report.passCount}/${report.totalScored} checks passed</span>` +
     `</span>`;
+
+  if (isTinaSite(report)) {
+    // The "1" is the llama itself, and the honest number sits right below it.
+    $('#ed-num').innerHTML =
+      `<img class="egg-one" src="/geo/llama.svg" alt="1" /><span class="egg-zeros">00</span>`;
+    $('#ed-scored').insertAdjacentHTML(
+      'afterend',
+      `<span class="egg-truth">Alright, it&rsquo;s really ${report.overall}. We had to try. 🦙</span>`,
+    );
+    document.documentElement.classList.add('llama-mode');
+    const bar = $('#ed-bar-fill');
+    bar.style.setProperty('--w', '100%');
+    bar.style.background = 'var(--orange)';
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        el.classList.remove('loading');
+        el.classList.add('loaded');
+      }),
+    );
+    return;
+  }
+
   countUp($('#ed-num'), report.overall, 900, true);
   const bar = $('#ed-bar-fill');
   bar.style.setProperty('--w', `${report.overall}%`);
