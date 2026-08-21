@@ -1602,9 +1602,10 @@ html.llama-mode body::after {
   to { opacity: 0.028; }
 }
 
-/* The llama hops up beside the score once it lands, then keeps dancing.
-   Three layers so the animations never fight over transform: wrapper owns the
-   entrance, img owns the loop, ::after is the contact shadow. */
+/* The llama springs up beside the score once it lands, then dances a loop:
+   four shuffle hops, a crouch, and a spin. Three layers so the animations
+   never fight over transform: wrapper owns the entrance, img owns the
+   routine, ::after is the contact shadow. */
 .egg-dancer {
   position: relative;
   align-self: flex-end;
@@ -1620,7 +1621,7 @@ html.llama-mode body::after {
   width: auto;
   /* Feet stay planted, so squash and tilt pivot from the ground. */
   transform-origin: 50% 100%;
-  animation: egg-dance 1.05s ease-in-out 1.35s infinite;
+  animation: egg-dance 2.6s 1.35s infinite;
 }
 
 /* Shrinks and fades on the airborne beats, which is what reads as a hop
@@ -1634,7 +1635,7 @@ html.llama-mode body::after {
   height: 0.42rem;
   border-radius: 50%;
   background: rgb(15 23 42 / 0.16);
-  animation: egg-shadow 1.05s ease-in-out 1.35s infinite;
+  animation: egg-shadow 2.6s 1.35s infinite;
 }
 
 @keyframes egg-rise {
@@ -1642,16 +1643,44 @@ html.llama-mode body::after {
   to   { transform: none; opacity: 1; }
 }
 
+/* Easing is per-segment rather than on the animation: ease-out up, ease-in
+   down. A single ease-in-out across the whole loop floats instead of bounces. */
 @keyframes egg-dance {
-  0%, 100% { transform: translate(-4%, 0) rotate(-9deg) scale(1.05, 0.95); }
-  25%      { transform: translate(0, -30%) rotate(0deg) scale(0.97, 1.04); }
-  50%      { transform: translate(4%, 0) rotate(9deg) scale(1.05, 0.95); }
-  75%      { transform: translate(0, -30%) rotate(0deg) scale(0.97, 1.04); }
+  0% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(0deg) scale(1, 1);
+       animation-timing-function: ease-out; }
+  6% { transform: perspective(520px) translate(-2%, -32%) rotate(-12deg) rotateY(0deg) scale(0.94, 1.07);
+       animation-timing-function: ease-in; }
+  13% { transform: perspective(520px) translate(-4%, 0) rotate(-5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  19% { transform: perspective(520px) translate(0, -32%) rotate(12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  26% { transform: perspective(520px) translate(4%, 0) rotate(5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  32% { transform: perspective(520px) translate(2%, -32%) rotate(-12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  39% { transform: perspective(520px) translate(-4%, 0) rotate(-5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  45% { transform: perspective(520px) translate(0, -32%) rotate(12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  52% { transform: perspective(520px) translate(4%, 0) rotate(5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-in; }
+  /* Crouch, then a full turn on the spot. */
+  60% { transform: perspective(520px) translate(2%, 2%) rotate(0deg) rotateY(0deg) scale(1.14, 0.86);
+        animation-timing-function: ease-out; }
+  74% { transform: perspective(520px) translate(0, -42%) rotate(0deg) rotateY(180deg) scale(0.94, 1.06);
+        animation-timing-function: ease-in; }
+  86% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(360deg) scale(1.12, 0.88);
+        animation-timing-function: ease-out; }
+  93% { transform: perspective(520px) translate(0, -10%) rotate(0deg) rotateY(360deg) scale(0.98, 1.02);
+        animation-timing-function: ease-in; }
+  100% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(360deg) scale(1, 1); }
 }
 
 @keyframes egg-shadow {
-  0%, 50%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
-  25%, 75%      { transform: translateX(-50%) scale(0.62); opacity: 0.45; }
+  0%, 13%, 26%, 39%, 52%, 86%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  60% { transform: translateX(-50%) scale(1.12); opacity: 1; }
+  6%, 19%, 32%, 45%, 93% { transform: translateX(-50%) scale(0.6); opacity: 0.42; }
+  74% { transform: translateX(-50%) scale(0.42); opacity: 0.28; }
 }
 
 @media (prefers-reduced-motion: reduce) {
