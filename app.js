@@ -385,7 +385,7 @@ const countUp = (el, to, ms, colorize) => {
 const editorialShell = () => `
   <div class="editorial loading" id="editorial">
     <div class="ed-main">
-      <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
+      <span class="ed-figure" id="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
       <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
       <span class="ed-scored" id="ed-scored"></span>
     </div>
@@ -424,6 +424,12 @@ const setEditorialLoaded = (report) => {
     const num = $('#ed-num');
     countUp(num, 100, 900);
     num.style.color = 'var(--orange)';
+    // Decorative, and it never appears off the egg path, so it lives here
+    // rather than in the shell.
+    $('#ed-figure').insertAdjacentHTML(
+      'beforeend',
+      `<span class="egg-dancer" aria-hidden="true"><img src="/geo/llama.svg" alt="" /></span>`,
+    );
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';

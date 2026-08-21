@@ -1602,6 +1602,62 @@ html.llama-mode body::after {
   to { opacity: 0.028; }
 }
 
+/* The llama hops up beside the score once it lands, then keeps dancing.
+   Three layers so the animations never fight over transform: wrapper owns the
+   entrance, img owns the loop, ::after is the contact shadow. */
+.egg-dancer {
+  position: relative;
+  align-self: flex-end;
+  display: block;
+  margin-left: 0.7rem;
+  transform-origin: 50% 100%;
+  animation: egg-rise 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) 0.75s both;
+}
+
+.egg-dancer img {
+  display: block;
+  height: clamp(3.8rem, 14vw, 6rem);
+  width: auto;
+  /* Feet stay planted, so squash and tilt pivot from the ground. */
+  transform-origin: 50% 100%;
+  animation: egg-dance 1.05s ease-in-out 1.35s infinite;
+}
+
+/* Shrinks and fades on the airborne beats, which is what reads as a hop
+   rather than a wobble. */
+.egg-dancer::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -0.32rem;
+  width: 68%;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: rgb(15 23 42 / 0.16);
+  animation: egg-shadow 1.05s ease-in-out 1.35s infinite;
+}
+
+@keyframes egg-rise {
+  from { transform: translateY(120%) scale(0.65); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+@keyframes egg-dance {
+  0%, 100% { transform: translate(-4%, 0) rotate(-9deg) scale(1.05, 0.95); }
+  25%      { transform: translate(0, -30%) rotate(0deg) scale(0.97, 1.04); }
+  50%      { transform: translate(4%, 0) rotate(9deg) scale(1.05, 0.95); }
+  75%      { transform: translate(0, -30%) rotate(0deg) scale(0.97, 1.04); }
+}
+
+@keyframes egg-shadow {
+  0%, 50%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  25%, 75%      { transform: translateX(-50%) scale(0.62); opacity: 0.45; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .llama-mode body::after { animation: none; opacity: 0.028; }
+  /* Still turns up, just stands still. */
+  .egg-dancer,
+  .egg-dancer img,
+  .egg-dancer::after { animation: none; }
 }
