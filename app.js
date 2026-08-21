@@ -401,10 +401,10 @@ const startEditorial = () => {
 };
 
 // Easter egg: analysing Tina's own site turns the whole score readout perfect —
-// a llama-shaped 100, every category at 100 in orange, all checks passing — and
-// tessellates the background. Display only: the report below still lists each
-// check's real status, and the markdown export, emailed report and CRM payload
-// all carry the true score.
+// 100, every category at 100 in orange, all checks passing — and tessellates the
+// background. Display only: the report below still lists each check's real
+// status, and the markdown export, emailed report and CRM payload all carry the
+// true score.
 const isTinaSite = (report) => /(^|\.)tina\.io$/.test(reportHost(report));
 
 const setEditorialLoaded = (report) => {
@@ -420,10 +420,10 @@ const setEditorialLoaded = (report) => {
     `</span>`;
 
   if (egg) {
-    // The "1" is the llama itself.
-    $('#ed-num').innerHTML =
-      `<img class="egg-one" src="/geo/llama-numeral.svg" alt="1" /><span class="egg-zeros">00</span>`;
     document.documentElement.classList.add('llama-mode');
+    const num = $('#ed-num');
+    countUp(num, 100, 900);
+    num.style.color = 'var(--orange)';
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';
