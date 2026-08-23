@@ -428,8 +428,11 @@ const setEditorialLoaded = (report) => {
     // rather than in the shell.
     $('#ed-figure').insertAdjacentHTML(
       'beforeend',
-      `<span class="egg-dancer" aria-hidden="true"><img src="/geo/llama.svg" alt="" /></span>`,
+      `<span class="egg-dancer" aria-hidden="true"><img src="/geo/llama.svg" alt="" width="142" height="197" /></span>`,
     );
+    // Next frame, so the negative start margin is laid out before it animates.
+    const dancer = $('.egg-dancer');
+    requestAnimationFrame(() => dancer.classList.add('in'));
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';
