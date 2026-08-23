@@ -407,6 +407,23 @@ const startEditorial = () => {
 // true score.
 const isTinaSite = (report) => /(^|\.)tina\.io$/.test(reportHost(report));
 
+// The llama dances to whatever score is on screen: the full routine at 90+,
+// down to a droop under 40. The egg's forced 100 drives it too, so Tina's own
+// site always gets the celebration.
+const danceTier = (score) =>
+  score >= 90 ? 'is-hype' : score >= 70 ? 'is-happy' : score >= 40 ? 'is-ok' : 'is-droop';
+
+const addDancer = (score) => {
+  $('#ed-figure').insertAdjacentHTML(
+    'beforeend',
+    `<span class="dancer ${danceTier(score)}" aria-hidden="true">` +
+      `<img src="/geo/llama.svg" alt="" width="142" height="197" /></span>`,
+  );
+  // Next frame, so the negative start margin is laid out before it animates.
+  const dancer = $('.dancer');
+  requestAnimationFrame(() => dancer.classList.add('in'));
+};
+
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
   const egg = isTinaSite(report);
@@ -419,20 +436,15 @@ const setEditorialLoaded = (report) => {
     `<span class="ed-count">${passed}/${report.totalScored} checks passed</span>` +
     `</span>`;
 
+  // Decorative, so it is built here rather than in the shell, which renders
+  // before there is a score to dance to.
+  addDancer(egg ? 100 : report.overall);
+
   if (egg) {
     document.documentElement.classList.add('llama-mode');
     const num = $('#ed-num');
     countUp(num, 100, 900);
     num.style.color = 'var(--orange)';
-    // Decorative, and it never appears off the egg path, so it lives here
-    // rather than in the shell.
-    $('#ed-figure').insertAdjacentHTML(
-      'beforeend',
-      `<span class="egg-dancer" aria-hidden="true"><img src="/geo/llama.svg" alt="" width="142" height="197" /></span>`,
-    );
-    // Next frame, so the negative start margin is laid out before it animates.
-    const dancer = $('.egg-dancer');
-    requestAnimationFrame(() => dancer.classList.add('in'));
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';
