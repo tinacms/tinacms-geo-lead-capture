@@ -1683,10 +1683,23 @@ html.llama-mode body::after {
   74% { transform: translateX(-50%) scale(0.42); opacity: 0.28; }
 }
 
+/* Reduced motion gets a gentler llama rather than a frozen one. Everything
+   vestibular goes: no hop, no spin, no travel, no scaling. What is left is a
+   slow rock in place, which the spec's "large-scale movement" wording allows
+   and which keeps the egg from being inert for anyone with the setting on. */
 @media (prefers-reduced-motion: reduce) {
   .llama-mode body::after { animation: none; opacity: 0.028; }
-  /* Still turns up, just stands still. */
-  .egg-dancer,
-  .egg-dancer img,
+  .egg-dancer { animation: egg-fade-in 0.4s ease-out 0.75s both; }
+  .egg-dancer img { animation: egg-sway 3.4s ease-in-out 1.15s infinite; }
   .egg-dancer::after { animation: none; }
+}
+
+@keyframes egg-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes egg-sway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50%      { transform: rotate(2.5deg); }
 }
