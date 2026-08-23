@@ -1613,7 +1613,11 @@ html.llama-mode body::after {
    routine, ::after is the contact shadow. */
 .egg-dancer {
   position: relative;
-  align-self: flex-end;
+  /* Stands on the digits' baseline, not the flex line's bottom edge. The line
+     box runs 11px past the baseline, and flex-end put the llama's feet down
+     there, reading as though it were sunk below the number. The img is
+     display:block, so this wrapper's baseline is its own bottom edge. */
+  align-self: baseline;
   display: block;
   transform-origin: 50% 100%;
   animation: egg-rise 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) 0.75s both;
@@ -1712,7 +1716,9 @@ html.llama-mode body::after {
     margin-left: 0.7rem;
   }
   .egg-dancer img { animation: egg-sway 3.4s ease-in-out 1.15s infinite; }
-  .egg-dancer::after { animation: none; }
+  /* The shadow only exists to sell the hop. Nothing leaves the ground here,
+     so a shadow parked under a rocking llama just reads as a smudge. */
+  .egg-dancer::after { display: none; }
 }
 
 @keyframes egg-fade-in {
