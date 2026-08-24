@@ -419,9 +419,33 @@ const addDancer = (score) => {
     `<span class="dancer ${danceTier(score)}" aria-hidden="true">` +
       `<img src="/geo/llama.svg" alt="" width="142" height="197" /></span>`,
   );
-  // Next frame, so the negative start margin is laid out before it animates.
-  const dancer = $('.dancer');
-  requestAnimationFrame(() => dancer.classList.add('in'));
+};
+
+// Sizes the score row for the result, then eases it there from the skeleton's
+// width. Two things widen it at once: the number reserves the digits it is
+// counting to, and the llama arrives. Reserving exactly those digits rather
+// than a flat three keeps a two-digit score sitting against the llama instead
+// of across a digit of dead space, and reserving them up front stops the row
+// reflowing every time the count gains a digit. The leftover growth is parked
+// in a negative margin and released next frame, so the centred row glides out
+// to its final width. Skipped under reduced motion, which takes it in one step.
+const sizeFigure = (shown) => {
+  const main = $('.ed-main');
+  const before = main.getBoundingClientRect().width;
+  $('#ed-num').style.minWidth = `${String(shown).length}ch`;
+  addDancer(shown);
+  const after = main.getBoundingClientRect().width;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return;
+  }
+  // Park the growth with the transition suppressed, commit it, then release.
+  // Setting it while the transition is live just eases toward the negative
+  // value and straight back, which nets out to no movement at all.
+  main.style.transition = 'none';
+  main.style.marginRight = `${before - after}px`;
+  void main.offsetWidth;
+  main.style.transition = '';
+  main.style.marginRight = '0px';
 };
 
 const setEditorialLoaded = (report) => {
@@ -436,9 +460,9 @@ const setEditorialLoaded = (report) => {
     `<span class="ed-count">${passed}/${report.totalScored} checks passed</span>` +
     `</span>`;
 
-  // Decorative, so it is built here rather than in the shell, which renders
-  // before there is a score to dance to.
-  addDancer(egg ? 100 : report.overall);
+  // Built here rather than in the shell, which renders before there is a score
+  // to size for or dance to.
+  sizeFigure(egg ? 100 : report.overall);
 
   if (egg) {
     document.documentElement.classList.add('llama-mode');

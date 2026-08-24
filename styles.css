@@ -361,6 +361,11 @@ input:focus {
 }
 .ed-main {
   display: grid;
+  /* The column lands wider than the skeleton: the llama arrives and the
+     hostname line fills in. JS parks that growth in a negative margin and
+     releases it here, so the centred row glides out instead of snapping.
+     See sizeFigure. */
+  transition: margin-right 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   justify-items: start;
   gap: 0.4rem;
   padding-right: clamp(2rem, 6vw, 4.5rem);
@@ -380,10 +385,10 @@ input:focus {
      breakpoint; at 12vw it dropped from 160px to 92px crossing it. */
   font-size: clamp(5.5rem, 22vw, 9rem);
   font-variant-numeric: tabular-nums;
-  /* Widest score is 100, and tabular figures make 1ch exactly one digit, so
-     three digits is the most this ever needs. Reserving it on the loading
-     skeleton too means the block never resizes: the score is centred, so any
-     digit gained mid-count shifted the whole row sideways. */
+  /* The skeleton reserves the widest score there is, so the column is settled
+     before the result lands. JS then narrows it to the digits actually needed,
+     so a two-digit score sits against the llama rather than across a digit of
+     dead space, and sizeFigure eases the difference. */
   min-width: 3ch;
 }
 .ed-bar {
@@ -1621,16 +1626,6 @@ html.llama-mode body::after {
   display: block;
   transform-origin: 50% 100%;
   animation: dancer-rise 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) 0.75s both;
-  /* Starts pulled fully out of the flow's width, so inserting the llama does
-     not widen the row. The score is centred, so a sudden 87px of new width
-     would jerk the number sideways. .in opens the gap over half a second,
-     under the llama's own 0.75s entrance delay, so the space is waiting for
-     it. 0.7213 is the mark's aspect ratio, 141.81 / 196.6. */
-  margin-left: calc(-0.7213 * clamp(3.8rem, 14vw, 6rem));
-  transition: margin-left 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.dancer.in {
   margin-left: 0.7rem;
 }
 
@@ -1757,13 +1752,9 @@ html.llama-mode body::after {
 
 @media (prefers-reduced-motion: reduce) {
   .llama-mode body::after { animation: none; opacity: 0.028; }
-  /* Final margin from the first frame: with no transition to ride, the
-     negative start would just be a one-frame jump. */
-  .dancer {
-    animation: dancer-fade-in 0.4s ease-out 0.75s both;
-    transition: none;
-    margin-left: 0.7rem;
-  }
+  .dancer { animation: dancer-fade-in 0.4s ease-out 0.75s both; }
+  /* JS skips the absorb entirely here, so there is nothing to ease. */
+  .ed-main { transition: none; }
   /* One gentle rock for every band. No hop, no spin, no travel, no scaling:
      what the spec calls large-scale movement all goes, and what is left keeps
      the llama from being a static sticker. */
