@@ -1629,10 +1629,17 @@ html.llama-mode body::after {
   margin-left: 0.7rem;
 }
 
-.dancer img {
+/* Masked rather than an <img> so the mark takes the score's colour, and
+   rather than inlining the paths so llama.svg stays the one source for the
+   shape. aspect-ratio pins the width off the viewBox, so the row is sized
+   before the mask file lands. */
+.dancer-mark {
   display: block;
   height: clamp(3.8rem, 14vw, 6rem);
-  width: auto;
+  aspect-ratio: 141.81 / 196.6;
+  background: currentColor;
+  -webkit-mask: url('/geo/llama.svg') center / contain no-repeat;
+  mask: url('/geo/llama.svg') center / contain no-repeat;
   /* Feet stay planted, so squash and tilt pivot from the ground. */
   transform-origin: 50% 100%;
   animation-delay: 1.35s;
@@ -1662,7 +1669,7 @@ html.llama-mode body::after {
 /* --- 90+ : the full routine ------------------------------------------------
    Easing is per-segment rather than on the animation: ease-out up, ease-in
    down. A single ease-in-out across the whole loop floats instead of bounces. */
-.dancer.is-hype img { animation-name: dancer-hype; animation-duration: 2.6s; }
+.dancer.is-hype .dancer-mark { animation-name: dancer-hype; animation-duration: 2.6s; }
 .dancer.is-hype::after { animation-name: dancer-shadow-hype; animation-duration: 2.6s; }
 
 @keyframes dancer-hype {
@@ -1704,7 +1711,7 @@ html.llama-mode body::after {
 }
 
 /* --- 70-89 : a happy bounce, no spin -------------------------------------- */
-.dancer.is-happy img { animation-name: dancer-happy; animation-duration: 1.45s; }
+.dancer.is-happy .dancer-mark { animation-name: dancer-happy; animation-duration: 1.45s; }
 .dancer.is-happy::after { animation-name: dancer-shadow-2beat; animation-duration: 1.45s; }
 
 @keyframes dancer-happy {
@@ -1719,7 +1726,7 @@ html.llama-mode body::after {
 }
 
 /* --- 40-69 : a modest sway with small hops -------------------------------- */
-.dancer.is-ok img { animation-name: dancer-ok; animation-duration: 2.1s; }
+.dancer.is-ok .dancer-mark { animation-name: dancer-ok; animation-duration: 2.1s; }
 .dancer.is-ok::after { animation-name: dancer-shadow-2beat; animation-duration: 2.1s; }
 
 @keyframes dancer-ok {
@@ -1741,7 +1748,7 @@ html.llama-mode body::after {
 /* --- under 40 : a droop --------------------------------------------------- */
 /* Head-down lean and a sag, breathing slowly. Nothing leaves the ground, so
    the shadow just sits there at full size. */
-.dancer.is-droop img { animation-name: dancer-droop; animation-duration: 3.8s;
+.dancer.is-droop .dancer-mark { animation-name: dancer-droop; animation-duration: 3.8s;
                        animation-timing-function: ease-in-out; }
 .dancer.is-droop::after { animation: none; }
 
@@ -1758,15 +1765,15 @@ html.llama-mode body::after {
   /* One gentle rock for every band. No hop, no spin, no travel, no scaling:
      what the spec calls large-scale movement all goes, and what is left keeps
      the llama from being a static sticker. */
-  .dancer img,
-  .dancer.is-hype img,
-  .dancer.is-happy img,
-  .dancer.is-ok img,
-  .dancer.is-droop img {
+  .dancer-mark,
+  .dancer.is-hype .dancer-mark,
+  .dancer.is-happy .dancer-mark,
+  .dancer.is-ok .dancer-mark,
+  .dancer.is-droop .dancer-mark {
     animation: dancer-sway 3.4s ease-in-out 1.15s infinite;
   }
   /* The band is still legible without motion: the droop keeps its lean, held
-     on the wrapper so it does not fight the sway on the img. */
+     on the wrapper so it does not fight the sway on the mark. */
   .dancer.is-droop { transform: rotate(5deg); }
   /* The shadow only exists to sell the hop. Nothing leaves the ground here,
      so a shadow parked under a rocking llama just reads as a smudge. */

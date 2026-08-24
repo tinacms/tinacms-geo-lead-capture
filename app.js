@@ -367,13 +367,16 @@ const edStatsPlaceholder = () =>
   ).join('');
 
 const countUp = (el, to, ms, colorize) => {
+  const tint = el.closest('.ed-figure') ?? el;
   const start = performance.now();
   const tick = (now) => {
     const t = Math.min(1, (now - start) / ms);
     const v = Math.round(to * (1 - (1 - t) ** 3));
     el.textContent = v;
     if (colorize) {
-      el.style.color = scoreColor(v);
+      // On the figure rather than the number, so the llama tints with it: the
+      // mark is a sibling, not a child, and takes the colour via currentColor.
+      tint.style.color = scoreColor(v);
     }
     if (t < 1) {
       requestAnimationFrame(tick);
@@ -417,7 +420,7 @@ const addDancer = (score) => {
   $('#ed-figure').insertAdjacentHTML(
     'beforeend',
     `<span class="dancer ${danceTier(score)}" aria-hidden="true">` +
-      `<img src="/geo/llama.svg" alt="" width="142" height="197" /></span>`,
+      `<span class="dancer-mark"></span></span>`,
   );
 };
 
@@ -468,7 +471,8 @@ const setEditorialLoaded = (report) => {
     document.documentElement.classList.add('llama-mode');
     const num = $('#ed-num');
     countUp(num, 100, 900);
-    num.style.color = 'var(--orange)';
+    // On the figure, so the llama picks it up too.
+    $('#ed-figure').style.color = 'var(--orange)';
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';
