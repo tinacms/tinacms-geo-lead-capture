@@ -361,6 +361,11 @@ input:focus {
 }
 .ed-main {
   display: grid;
+  /* The column lands wider than the skeleton: the llama arrives and the
+     hostname line fills in. JS parks that growth in a negative margin and
+     releases it here, so the centred row glides out instead of snapping.
+     See sizeFigure. */
+  transition: margin-right 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   justify-items: start;
   gap: 0.4rem;
   padding-right: clamp(2rem, 6vw, 4.5rem);
@@ -380,6 +385,11 @@ input:focus {
      breakpoint; at 12vw it dropped from 160px to 92px crossing it. */
   font-size: clamp(5.5rem, 22vw, 9rem);
   font-variant-numeric: tabular-nums;
+  /* The skeleton reserves the widest score there is, so the column is settled
+     before the result lands. JS then narrows it to the digits actually needed,
+     so a two-digit score sits against the llama rather than across a digit of
+     dead space, and sizeFigure eases the difference. */
+  min-width: 3ch;
 }
 .ed-bar {
   width: 100%;
@@ -1602,45 +1612,180 @@ html.llama-mode body::after {
   to { opacity: 0.028; }
 }
 
-/* The llama stands in for the 1 in 100. It must sit on the same line as the
-   zeros, so the score cannot wrap. */
-.ed-num {
-  white-space: nowrap;
+/* The llama turns up beside every score and dances to it. Four bands, from
+   the full routine at 90+ down to a droop under 40. Three layers so the
+   animations never fight over transform: wrapper owns the entrance, img owns
+   the routine, ::after is the contact shadow. */
+.dancer {
+  position: relative;
+  /* Stands on the digits' baseline, not the flex line's bottom edge. The line
+     box runs 11px past the baseline, and flex-end put the llama's feet down
+     there, reading as though it were sunk below the number. The img is
+     display:block, so this wrapper's baseline is its own bottom edge. */
+  align-self: baseline;
+  display: block;
+  transform-origin: 50% 100%;
+  animation: dancer-rise 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) 0.75s both;
+  margin-left: 0.7rem;
 }
 
-.egg-one {
-  display: inline-block;
-  height: 0.74em;
-  width: auto;
-  /* Optically seated on the baseline, like a numeral rather than an image */
-  vertical-align: -0.02em;
-  margin-right: 0.04em;
-  animation: egg-pop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1) 0.15s both;
+/* Masked rather than an <img> so the mark takes the score's colour, and
+   rather than inlining the paths so llama.svg stays the one source for the
+   shape. aspect-ratio pins the width off the viewBox, so the row is sized
+   before the mask file lands. */
+.dancer-mark {
+  display: block;
+  height: clamp(3.8rem, 14vw, 6rem);
+  aspect-ratio: 141.81 / 196.6;
+  background: currentColor;
+  -webkit-mask: url('/geo/llama.svg') center / contain no-repeat;
+  mask: url('/geo/llama.svg') center / contain no-repeat;
+  /* Feet stay planted, so squash and tilt pivot from the ground. */
+  transform-origin: 50% 100%;
+  animation-delay: 1.35s;
+  animation-iteration-count: infinite;
 }
 
-.egg-zeros {
-  color: var(--orange);
+/* Shrinks and fades on the airborne beats, which is what reads as a hop
+   rather than a wobble. */
+.dancer::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -0.32rem;
+  width: 68%;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: rgb(15 23 42 / 0.16);
+  animation-delay: 1.35s;
+  animation-iteration-count: infinite;
 }
 
-@keyframes egg-pop {
-  from { transform: translateY(0.18em) rotate(-8deg); opacity: 0; }
+@keyframes dancer-rise {
+  from { transform: translateY(120%) scale(0.65); opacity: 0; }
   to   { transform: none; opacity: 1; }
 }
 
-.egg-truth {
-  display: block;
-  margin-top: 0.55rem;
-  font-size: 0.85rem;
-  color: var(--text-2);
-  animation: llama-fade-in 0.5s ease 1.1s both;
+/* --- 90+ : the full routine ------------------------------------------------
+   Easing is per-segment rather than on the animation: ease-out up, ease-in
+   down. A single ease-in-out across the whole loop floats instead of bounces. */
+.dancer.is-hype .dancer-mark { animation-name: dancer-hype; animation-duration: 2.6s; }
+.dancer.is-hype::after { animation-name: dancer-shadow-hype; animation-duration: 2.6s; }
+
+@keyframes dancer-hype {
+  0% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(0deg) scale(1, 1);
+       animation-timing-function: ease-out; }
+  6% { transform: perspective(520px) translate(-2%, -32%) rotate(-12deg) rotateY(0deg) scale(0.94, 1.07);
+       animation-timing-function: ease-in; }
+  13% { transform: perspective(520px) translate(-4%, 0) rotate(-5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  19% { transform: perspective(520px) translate(0, -32%) rotate(12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  26% { transform: perspective(520px) translate(4%, 0) rotate(5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  32% { transform: perspective(520px) translate(2%, -32%) rotate(-12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  39% { transform: perspective(520px) translate(-4%, 0) rotate(-5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-out; }
+  45% { transform: perspective(520px) translate(0, -32%) rotate(12deg) rotateY(0deg) scale(0.94, 1.07);
+        animation-timing-function: ease-in; }
+  52% { transform: perspective(520px) translate(4%, 0) rotate(5deg) rotateY(0deg) scale(1.08, 0.92);
+        animation-timing-function: ease-in; }
+  /* Crouch, then a full turn on the spot. */
+  60% { transform: perspective(520px) translate(2%, 2%) rotate(0deg) rotateY(0deg) scale(1.14, 0.86);
+        animation-timing-function: ease-out; }
+  74% { transform: perspective(520px) translate(0, -42%) rotate(0deg) rotateY(180deg) scale(0.94, 1.06);
+        animation-timing-function: ease-in; }
+  86% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(360deg) scale(1.12, 0.88);
+        animation-timing-function: ease-out; }
+  93% { transform: perspective(520px) translate(0, -10%) rotate(0deg) rotateY(360deg) scale(0.98, 1.02);
+        animation-timing-function: ease-in; }
+  100% { transform: perspective(520px) translate(0, 0) rotate(0deg) rotateY(360deg) scale(1, 1); }
 }
 
-@keyframes llama-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+@keyframes dancer-shadow-hype {
+  0%, 13%, 26%, 39%, 52%, 86%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  60% { transform: translateX(-50%) scale(1.12); opacity: 1; }
+  6%, 19%, 32%, 45%, 93% { transform: translateX(-50%) scale(0.6); opacity: 0.42; }
+  74% { transform: translateX(-50%) scale(0.42); opacity: 0.28; }
+}
+
+/* --- 70-89 : a happy bounce, no spin -------------------------------------- */
+.dancer.is-happy .dancer-mark { animation-name: dancer-happy; animation-duration: 1.45s; }
+.dancer.is-happy::after { animation-name: dancer-shadow-2beat; animation-duration: 1.45s; }
+
+@keyframes dancer-happy {
+  0%, 100% { transform: translate(0, 0) rotate(-7deg) scale(1.05, 0.95);
+             animation-timing-function: ease-out; }
+  25% { transform: translate(-2%, -24%) rotate(0deg) scale(0.97, 1.03);
+        animation-timing-function: ease-in; }
+  50% { transform: translate(0, 0) rotate(7deg) scale(1.05, 0.95);
+        animation-timing-function: ease-out; }
+  75% { transform: translate(2%, -24%) rotate(0deg) scale(0.97, 1.03);
+        animation-timing-function: ease-in; }
+}
+
+/* --- 40-69 : a modest sway with small hops -------------------------------- */
+.dancer.is-ok .dancer-mark { animation-name: dancer-ok; animation-duration: 2.1s; }
+.dancer.is-ok::after { animation-name: dancer-shadow-2beat; animation-duration: 2.1s; }
+
+@keyframes dancer-ok {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg) scale(1.02, 0.98);
+             animation-timing-function: ease-out; }
+  25% { transform: translate(0, -9%) rotate(0deg) scale(0.99, 1.01);
+        animation-timing-function: ease-in; }
+  50% { transform: translate(0, 0) rotate(4deg) scale(1.02, 0.98);
+        animation-timing-function: ease-out; }
+  75% { transform: translate(0, -9%) rotate(0deg) scale(0.99, 1.01);
+        animation-timing-function: ease-in; }
+}
+
+@keyframes dancer-shadow-2beat {
+  0%, 50%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  25%, 75% { transform: translateX(-50%) scale(0.72); opacity: 0.55; }
+}
+
+/* --- under 40 : a droop --------------------------------------------------- */
+/* Head-down lean and a sag, breathing slowly. Nothing leaves the ground, so
+   the shadow just sits there at full size. */
+.dancer.is-droop .dancer-mark { animation-name: dancer-droop; animation-duration: 3.8s;
+                       animation-timing-function: ease-in-out; }
+.dancer.is-droop::after { animation: none; }
+
+@keyframes dancer-droop {
+  0%, 100% { transform: translate(0, 2%) rotate(3deg) scale(1.02, 0.94); }
+  50%      { transform: translate(0, 3%) rotate(6deg) scale(1.03, 0.92); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .llama-mode body::after { animation: none; opacity: 0.028; }
-  .egg-one, .egg-truth { animation: none; }
+  .dancer { animation: dancer-fade-in 0.4s ease-out 0.75s both; }
+  /* JS skips the absorb entirely here, so there is nothing to ease. */
+  .ed-main { transition: none; }
+  /* One gentle rock for every band. No hop, no spin, no travel, no scaling:
+     what the spec calls large-scale movement all goes, and what is left keeps
+     the llama from being a static sticker. */
+  .dancer-mark,
+  .dancer.is-hype .dancer-mark,
+  .dancer.is-happy .dancer-mark,
+  .dancer.is-ok .dancer-mark,
+  .dancer.is-droop .dancer-mark {
+    animation: dancer-sway 3.4s ease-in-out 1.15s infinite;
+  }
+  /* The band is still legible without motion: the droop keeps its lean, held
+     on the wrapper so it does not fight the sway on the mark. */
+  .dancer.is-droop { transform: rotate(5deg); }
+  /* The shadow only exists to sell the hop. Nothing leaves the ground here,
+     so a shadow parked under a rocking llama just reads as a smudge. */
+  .dancer::after { display: none; }
+}
+
+@keyframes dancer-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes dancer-sway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50%      { transform: rotate(2.5deg); }
 }

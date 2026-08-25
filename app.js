@@ -367,13 +367,16 @@ const edStatsPlaceholder = () =>
   ).join('');
 
 const countUp = (el, to, ms, colorize) => {
+  const tint = el.closest('.ed-figure') ?? el;
   const start = performance.now();
   const tick = (now) => {
     const t = Math.min(1, (now - start) / ms);
     const v = Math.round(to * (1 - (1 - t) ** 3));
     el.textContent = v;
     if (colorize) {
-      el.style.color = scoreColor(v);
+      // On the figure rather than the number, so the llama tints with it: the
+      // mark is a sibling, not a child, and takes the colour via currentColor.
+      tint.style.color = scoreColor(v);
     }
     if (t < 1) {
       requestAnimationFrame(tick);
@@ -385,7 +388,7 @@ const countUp = (el, to, ms, colorize) => {
 const editorialShell = () => `
   <div class="editorial loading" id="editorial">
     <div class="ed-main">
-      <span class="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
+      <span class="ed-figure" id="ed-figure"><span class="ed-num" id="ed-num">0</span></span>
       <span class="ed-bar"><span class="ed-bar-fill" id="ed-bar-fill"></span></span>
       <span class="ed-scored" id="ed-scored"></span>
     </div>
@@ -401,11 +404,52 @@ const startEditorial = () => {
 };
 
 // Easter egg: analysing Tina's own site turns the whole score readout perfect —
-// a llama-shaped 100, every category at 100 in orange, all checks passing — and
-// tessellates the background. Display only: the report below still lists each
-// check's real status, and the markdown export, emailed report and CRM payload
-// all carry the true score.
+// 100, every category at 100 in orange, all checks passing — and tessellates the
+// background. Display only: the report below still lists each check's real
+// status, and the markdown export, emailed report and CRM payload all carry the
+// true score.
 const isTinaSite = (report) => /(^|\.)tina\.io$/.test(reportHost(report));
+
+// The llama dances to whatever score is on screen: the full routine at 90+,
+// down to a droop under 40. The egg's forced 100 drives it too, so Tina's own
+// site always gets the celebration.
+const danceTier = (score) =>
+  score >= 90 ? 'is-hype' : score >= 70 ? 'is-happy' : score >= 40 ? 'is-ok' : 'is-droop';
+
+const addDancer = (score) => {
+  $('#ed-figure').insertAdjacentHTML(
+    'beforeend',
+    `<span class="dancer ${danceTier(score)}" aria-hidden="true">` +
+      `<span class="dancer-mark"></span></span>`,
+  );
+};
+
+// Sizes the score row for the result, then eases it there from the skeleton's
+// width. Two things widen it at once: the number reserves the digits it is
+// counting to, and the llama arrives. Reserving exactly those digits rather
+// than a flat three keeps a two-digit score sitting against the llama instead
+// of across a digit of dead space, and reserving them up front stops the row
+// reflowing every time the count gains a digit. The leftover growth is parked
+// in a negative margin and released next frame, so the centred row glides out
+// to its final width. Skipped under reduced motion, which takes it in one step.
+const sizeFigure = (shown) => {
+  const main = $('.ed-main');
+  const before = main.getBoundingClientRect().width;
+  $('#ed-num').style.minWidth = `${String(shown).length}ch`;
+  addDancer(shown);
+  const after = main.getBoundingClientRect().width;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return;
+  }
+  // Park the growth with the transition suppressed, commit it, then release.
+  // Setting it while the transition is live just eases toward the negative
+  // value and straight back, which nets out to no movement at all.
+  main.style.transition = 'none';
+  main.style.marginRight = `${before - after}px`;
+  void main.offsetWidth;
+  main.style.transition = '';
+  main.style.marginRight = '0px';
+};
 
 const setEditorialLoaded = (report) => {
   const el = $('#editorial');
@@ -419,11 +463,16 @@ const setEditorialLoaded = (report) => {
     `<span class="ed-count">${passed}/${report.totalScored} checks passed</span>` +
     `</span>`;
 
+  // Built here rather than in the shell, which renders before there is a score
+  // to size for or dance to.
+  sizeFigure(egg ? 100 : report.overall);
+
   if (egg) {
-    // The "1" is the llama itself.
-    $('#ed-num').innerHTML =
-      `<img class="egg-one" src="/geo/llama-numeral.svg" alt="1" /><span class="egg-zeros">00</span>`;
     document.documentElement.classList.add('llama-mode');
+    const num = $('#ed-num');
+    countUp(num, 100, 900);
+    // On the figure, so the llama picks it up too.
+    $('#ed-figure').style.color = 'var(--orange)';
     const bar = $('#ed-bar-fill');
     bar.style.setProperty('--w', '100%');
     bar.style.background = 'var(--orange)';
