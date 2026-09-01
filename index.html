@@ -97,45 +97,69 @@
       </div>
     </header>
 
-    <div class="wrap page">
+    <div class="page">
       <section class="hero">
-        <img class="hero-robot" src="/geo/llama-vr.png" alt="TinaCMS llama exploring AI search in a VR headset" width="440" height="256" />
-        <h1>Is your site ready for <span class="hl">AI search</span>?</h1>
-        <form class="analyze-form" id="analyze-form" novalidate>
-          <div class="input-wrap">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input
-              type="text"
-              id="url"
-              inputmode="url"
-              placeholder="yourdomain.com/page"
-              aria-label="Page URL to analyze"
-            />
-          </div>
-          <button class="btn" type="submit" id="analyze-btn">
-            Analyze
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
-        </form>
-        <!-- Always in the DOM so showing an error never shifts the layout -->
-        <p class="error" id="form-error" role="alert" aria-live="polite"></p>
-      </section>
-
-      <main class="results hidden" id="results"></main>
-
-      <section class="cta-banner reveal">
-        <div class="cta-text">
-          <h2>Talk to a Tina Expert</h2>
-          <p>
-            Evaluating Tina for your project? Book a 30-minute call with a
-            TinaCMS Architect.
-          </p>
-          <a class="btn cta-btn" href="https://tina.io" target="_blank" rel="noopener">
-            Schedule Call
+        <div class="hero-copy">
+          <a class="yt-badge" href="https://www.youtube.com/shorts/5NlRlH3qdB4" target="_blank" rel="noopener">
+            <svg viewBox="0 0 68 48" width="20" height="14" aria-hidden="true"><path d="M66.52 7.36C65.6 4.96 63.84 3.2 61.44 2.28 57.68 1 34 1 34 1S10.32 1 6.56 2.28C4.16 3.2 2.4 4.96 1.48 7.36 0 12.12 0 24 0 24s0 11.88 1.48 16.64c.92 2.4 2.68 4.16 5.08 5.08C10.32 47 34 47 34 47s23.68 0 27.44-1.28c2.4-.92 4.16-2.68 5.08-5.08C68 35.88 68 24 68 24s0-11.88-1.48-16.64z" fill="#f00"/><path d="M45 24 27 14v20z" fill="#fff"/></svg>
+            Watch the short
           </a>
+          <h1>Is your site ready for <span class="hl">AI search</span>?</h1>
+          <form class="analyze-form" id="analyze-form" novalidate>
+            <div class="input-wrap">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                type="text"
+                id="url"
+                inputmode="url"
+                placeholder="yourdomain.com/page"
+                aria-label="Page URL to analyze"
+              />
+            </div>
+            <button class="btn" type="submit" id="analyze-btn">
+              Analyze
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
+          <!-- Always in the DOM so showing an error never shifts the layout -->
+          <p class="error" id="form-error" role="alert" aria-live="polite"></p>
         </div>
-        <img class="cta-llama-outline" src="/geo/tina-llama-outline.svg" alt="" aria-hidden="true" width="150" height="207" />
+
+        <div class="hero-video">
+          <!-- Facade: the YouTube embed only loads once someone asks for it. -->
+          <button class="short" id="short" type="button" aria-label="Play the short: Markdown is your GEO secret">
+            <img src="/geo/short-thumb.jpg" alt="" width="302" height="543" />
+            <span class="short-play">
+              <svg viewBox="0 0 68 48" width="42" height="30" aria-hidden="true"><path d="M45 24 27 14v20z" fill="#fff"/></svg>
+            </span>
+          </button>
+          <img class="hero-llama" src="/geo/llama-fly.png" alt="" aria-hidden="true" width="230" height="174" />
+          <!-- Baked to a PNG (see .context/shots/bake-caption.mjs): Chrome rounds
+               glyph baselines to whole pixels, so live text on the tilted pill
+               steps; an image rotates smoothly. -->
+          <span class="short-caption">
+            <img src="/geo/short-caption.png" alt="Markdown is your GEO secret · 0:58" width="231" height="22" />
+          </span>
+        </div>
       </section>
+
+      <div class="wrap">
+        <main class="results hidden" id="results"></main>
+
+        <section class="cta-banner reveal">
+          <div class="cta-text">
+            <h2>Talk to a Tina Expert</h2>
+            <p>
+              Evaluating Tina for your project? Book a 30-minute call with a
+              TinaCMS Architect.
+            </p>
+            <a class="btn cta-btn" href="https://tina.io" target="_blank" rel="noopener">
+              Schedule Call
+            </a>
+          </div>
+          <img class="cta-llama-outline" src="/geo/tina-llama-outline.svg" alt="" aria-hidden="true" width="150" height="207" />
+        </section>
+      </div>
     </div>
 
     <footer class="site">
