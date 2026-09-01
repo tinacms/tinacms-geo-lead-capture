@@ -86,9 +86,9 @@ body::before {
 }
 
 .header-inner {
-  max-width: 72rem;
+  max-width: 90rem;
   margin: 0 auto;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -116,8 +116,8 @@ body::before {
   color: var(--orange-600);
 }
 
-.btn-sm {
-  padding: 0.5rem 1.1rem;
+.header-nav .btn {
+  padding: 0.35rem 1.1rem;
   font-size: 0.9rem;
 }
 
@@ -140,10 +140,56 @@ h3 {
   font-weight: 600;
 }
 
-/* Hero */
+/* Hero: copy on the left, the short on the right, both centred against the
+   phone, which is the tallest thing in the row. Wider than .wrap on purpose —
+   the report below stays at reading width, the hero does not. */
 .hero {
-  text-align: center;
-  padding: 4.5rem 0 0;
+  width: min(100% - 3rem, 71rem);
+  margin-inline: auto;
+  /* The extra top padding is headroom for the llama, which flies about 65px
+     above the frame — without it the card sits closer to the header than to
+     the report below. */
+  padding: 5.75rem 0 1rem;
+  display: grid;
+  grid-template-columns: 1.32fr 1fr;
+  column-gap: 4rem;
+  align-items: center;
+}
+
+.hero-copy {
+  min-width: 0;
+  /* The error row under the form always reserves its height (see .error), so
+     add that height back on top to keep the copy centred against the frame. */
+  margin-top: 2.5rem;
+}
+
+.hero .error {
+  margin-inline: 0;
+}
+
+/* tina.io's hero badge: white pill, light blue hairline, YouTube mark inline */
+.yt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 1.3rem 0.3rem 0.8rem;
+  border: 1px solid #b3d9ff;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--blue);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+
+.yt-badge:hover {
+  border-color: var(--blue);
+}
+
+.yt-badge svg {
+  display: block;
 }
 
 .badge {
@@ -159,9 +205,9 @@ h3 {
 }
 
 .hero h1 {
-  font-size: clamp(2.25rem, 5vw, 3.75rem);
-  max-width: 20ch;
-  margin: 1.5rem auto 0;
+  font-size: clamp(2.1875rem, 5vw, 3.75rem);
+  line-height: 1.09;
+  margin: 1.5rem 0 0;
 }
 
 .hero h1 .hl {
@@ -180,7 +226,13 @@ h3 {
   display: flex;
   gap: 0.75rem;
   max-width: 34rem;
-  margin: 2.5rem auto 0;
+  margin: 2.5rem 0 0;
+}
+
+/* Hero controls sit a little shorter than the report's inputs and buttons */
+.analyze-form input[type='text'],
+.analyze-form .btn {
+  padding-block: 0.7rem;
 }
 
 .input-wrap {
@@ -1542,17 +1594,158 @@ footer.site {
   }
 }
 
-/* Robot llama over the hero title, fading into it */
-.hero-robot {
+/* The short, framed like a phone and tilted off-square. The frame, the caption
+   and the llama are siblings so only the frame carries the rotation — a tilted
+   caption reads as a mistake rather than a flourish. */
+.hero-video {
+  position: relative;
+  width: min(310px, 58vw);
+  margin-inline: auto;
+}
+
+/* Seafoam wash behind the phone, echoing the page glow */
+.hero-video::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -32%;
+  top: 32%;
+  width: 66%;
+  height: 41%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(150, 235, 235, 0.65), rgba(150, 235, 235, 0));
+}
+
+.short {
   display: block;
-  width: clamp(260px, 44vw, 460px);
-  aspect-ratio: 1254 / 720; /* crop the full-body render to head-through-waist */
-  height: auto;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  padding: 0;
+  border: 4px solid var(--orange);
+  border-radius: 28px;
+  background: #0e0e12;
+  overflow: hidden;
+  cursor: pointer;
+  transform: rotate(2deg);
+  box-shadow: 0 18px 44px rgba(0, 60, 120, 0.14);
+}
+
+.short img {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  object-position: center top;
-  margin: -0.5rem auto -1.5rem;
-  -webkit-mask-image: linear-gradient(to bottom, #000 64%, transparent 92%);
-  mask-image: linear-gradient(to bottom, #000 64%, transparent 92%);
+}
+
+/* The player letterboxes itself inside its box, so oversize it and let the
+   frame clip the bars off */
+.short iframe {
+  position: absolute;
+  top: -2%;
+  left: -2%;
+  width: 104%;
+  height: 104%;
+  border: 0;
+}
+
+/* YouTube's play button in Tina orange, on the same gradient as .btn */
+.short-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 88px;
+  height: 62px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(to bottom right, #ff724b, var(--orange-600));
+  transition: transform 0.15s ease-out;
+}
+
+.short:hover .short-play {
+  transform: scale(1.06);
+}
+
+.short-caption {
+  position: absolute;
+  left: 50%;
+  /* Clear of the player's own controls once the video is running */
+  bottom: -24px;
+  /* The frame is rotated, so its bottom edge centres ~10px left of the box.
+     The caption takes the frame's full tilt so it reads as part of the card.
+     Chrome rounds each glyph's baseline to a whole pixel row, so the letters
+     step slightly along the tilt. Measured across will-change, perspective(1px)
+     + backface-visibility, filter, opacity, text-stroke and SVG <text>: every
+     one snaps by the same 0.27px RMS at 1x, so none of them is worth carrying.
+     Only unrotated text or baked outlines avoid it. */
+  transform: translateX(calc(-50% - 10px)) rotate(2deg);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0.4rem 1.1rem;
+  line-height: 0;
+  box-shadow: 0 4px 14px rgba(0, 60, 120, 0.12);
+}
+
+/* Baked at 4x, so it stays sharp on hidpi and downscales cleanly */
+.short-caption img {
+  display: block;
+  width: 231.09px;
+  height: auto;
+}
+
+/* Percentages keep the llama pinned to the frame's top-right corner as the
+   frame scales down */
+.hero-llama {
+  position: absolute;
+  width: 50%;
+  height: auto;
+  right: -27%;
+  top: -11.8%;
+  pointer-events: none;
+}
+
+/* Stacked hero: copy centred above the short */
+@media (max-width: 880px) {
+  .hero {
+    grid-template-columns: 1fr;
+    /* The invisible error row under the form supplies part of the gap; the
+       rest is headroom for the llama, which flies above the frame */
+    row-gap: 2.25rem;
+    padding-top: 2rem;
+    text-align: center;
+  }
+
+  .hero-copy {
+    margin-top: 0;
+  }
+
+  .yt-badge {
+    font-size: 0.8125rem;
+    padding-block: 0.25rem;
+  }
+
+  .hero h1 {
+    margin-top: 1rem;
+    /* Breaks the title over three lines, as in the mockup — a full-width line
+       of 35px type reads as a wall on a phone */
+    max-width: 12ch;
+    margin-inline: auto;
+  }
+
+  .analyze-form {
+    flex-direction: column;
+    margin-top: 1.5rem;
+    margin-inline: auto;
+  }
+
+  .short-caption img {
+    width: 198px;
+  }
+
+  .hero .error {
+    margin-inline: auto;
+  }
 }
 
 /* Fix-subcard link row: docs on the left, SSW rule on the right */

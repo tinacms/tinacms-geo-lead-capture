@@ -746,3 +746,14 @@ if (presetUrl) {
   input.value = presetUrl;
   requestAnimationFrame(() => $('#analyze-form').requestSubmit());
 }
+
+// The short is a facade: the YouTube embed only loads once someone asks for it,
+// so the hero costs one JPEG rather than an iframe.
+$('#short').addEventListener('click', (e) => {
+  e.currentTarget.outerHTML =
+    '<div class="short"><iframe title="Markdown is your GEO secret" ' +
+    // cc_load_policy=0 keeps the auto-generated captions off; the ones burned
+    // into the video itself are part of the picture and can't be turned off.
+    'src="https://www.youtube.com/embed/5NlRlH3qdB4?autoplay=1&playsinline=1&cc_load_policy=0" ' +
+    'allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';
+});
