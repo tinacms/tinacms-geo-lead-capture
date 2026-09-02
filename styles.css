@@ -72,6 +72,10 @@ body::before {
 
 .page {
   flex: 1 0 auto;
+  /* The llama flies past the hero's right edge, which at some widths is also
+     the viewport's. clip rather than hidden: hidden would make this a scroll
+     container and break the sticky header. */
+  overflow-x: clip;
 }
 
 /* Header */
@@ -1700,7 +1704,10 @@ footer.site {
   position: absolute;
   width: 50%;
   height: auto;
-  right: -27%;
+  /* -27% of the 310px frame. Below ~1200px the frame tracks the viewport edge
+     faster than the llama's overhang shrinks, so the second term reels it back
+     in, keeping the cape ~20px inside the edge instead of clipped by .page. */
+  right: calc(-84px + max(0px, 260px - 21.5vw));
   top: -11.8%;
   pointer-events: none;
 }
@@ -1741,6 +1748,11 @@ footer.site {
 
   .short-caption img {
     width: 198px;
+  }
+
+  /* Stacked, the frame is centred with room either side again */
+  .hero-llama {
+    right: -27%;
   }
 
   .hero .error {
